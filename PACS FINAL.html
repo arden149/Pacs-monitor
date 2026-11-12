@@ -1,0 +1,3193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Giám Sát Sự Cố PACS - Ban IT</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome 6 CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f8fafc;
+            color: #0f172a;
+            -webkit-tap-highlight-color: transparent;
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        input[type="datetime-local"] {
+            -webkit-appearance: none;
+            appearance: none;
+            min-width: 0;
+            max-width: 100%;
+        }
+        input[type="datetime-local"]::-webkit-date-and-time-value {
+            text-align: left;
+            margin: 0;
+        }
+        @media (max-width: 640px) {
+            input, select, textarea { font-size: 14px !important; }
+            input[type="datetime-local"] {
+                font-size: 13px !important;
+                height: 38px !important;
+                padding: 0.35rem 0.65rem !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col pb-20 sm:pb-8">
+
+    <!-- HEADER GỌN GÀNG, HIỆN ĐẠI -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2">
+            
+            <!-- Bên trái: Logo + Tabs chuyển nhanh -->
+            <div class="flex items-center space-x-3 sm:space-x-5 min-w-0">
+                <div class="flex items-center space-x-2.5 min-w-0">
+                    <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-sm shrink-0">
+                        <i class="fa-solid fa-hospital-user text-sm"></i>
+                    </div>
+                    <div class="truncate">
+                        <h1 class="text-sm sm:text-base font-bold text-slate-900 truncate">PACS Monitor</h1>
+                        <div class="flex items-center space-x-1.5">
+                            <span id="save-status-dot" class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
+                            <span id="save-status-text" class="text-[11px] font-medium text-slate-500 truncate">Chưa kết nối DB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nút chuyển 3 Tab trên PC: Bảng Sự Cố | Thống Kê | Danh Mục -->
+                <div class="hidden sm:flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+                    <button type="button" id="tab-btn-monitor" onclick="switchTab('monitor')"
+                        class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition cursor-pointer">
+                        <i class="fa-solid fa-table-list"></i>
+                        <span>Bảng Sự Cố</span>
+                        <span id="badge-total-tab" class="ml-1 px-1.5 py-0.2 text-[10px] rounded-full bg-blue-100 text-blue-700 font-bold">0</span>
+                    </button>
+                    <button type="button" id="tab-btn-stats" onclick="switchTab('stats')"
+                        class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer">
+                        <i class="fa-solid fa-chart-column"></i>
+                        <span>Thống Kê</span>
+                    </button>
+                    <button type="button" id="tab-btn-config" onclick="switchTab('config')"
+                        class="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>Danh Mục</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bên phải: Các nút thao tác chính -->
+            <div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+                <!-- Nút Sao lưu lên Firebase -->
+                <button type="button" id="btn-cloud-push" onclick="manualPushToFirebase()"
+                    class="inline-flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-sm transition cursor-pointer whitespace-nowrap"
+                    title="Sao lưu dữ liệu hiện tại lên Google Firebase">
+                    <i class="fa-solid fa-cloud-arrow-up" id="cloud-push-icon"></i>
+                    <span class="hidden md:inline">Sao lưu DB</span>
+                </button>
+
+                <!-- Nút Tải dữ liệu từ Firebase về -->
+                <button type="button" id="btn-cloud-pull" onclick="fetchFromFirebase(true)"
+                    class="inline-flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer whitespace-nowrap"
+                    title="Tải dữ liệu mới nhất từ Firebase về">
+                    <i class="fa-solid fa-rotate" id="cloud-pull-icon"></i>
+                    <span class="hidden md:inline">Làm mới</span>
+                </button>
+
+                <!-- Copy Báo cáo Giao Ca (Số liệu trong ngày) -->
+                <button type="button" onclick="copyShiftHandoverReport()"
+                    class="inline-flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition cursor-pointer whitespace-nowrap"
+                    title="Copy nhanh báo cáo số liệu sự cố trong ngày hôm nay">
+                    <i class="fa-regular fa-copy"></i>
+                    <span class="hidden sm:inline">Số liệu (Hôm nay)</span>
+                </button>
+
+                <!-- Xuất Excel -->
+                <button type="button" onclick="exportExcelCSV()"
+                    class="inline-flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition cursor-pointer whitespace-nowrap"
+                    title="Xuất bảng ra file Excel (.csv)">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span class="hidden sm:inline">Excel</span>
+                </button>
+
+                <!-- Menu Công cụ & Cài đặt (Gom gọn các nút phụ) -->
+                <div class="relative">
+                    <button type="button" onclick="toggleToolsDropdown(event)"
+                        class="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition cursor-pointer"
+                        title="Cài đặt Firebase, Thùng rác & Sao lưu file">
+                        <i class="fa-solid fa-gear"></i>
+                        <span id="trash-dot-indicator" class="hidden w-2 h-2 rounded-full bg-red-500"></span>
+                    </button>
+
+                    <!-- Dropdown Menu -->
+                    <div id="tools-dropdown-menu" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 py-1.5 z-50 text-xs">
+                        <button type="button" onclick="openFirebaseModal(); closeToolsDropdown();"
+                            class="w-full px-3.5 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between text-slate-700 font-semibold">
+                            <span class="flex items-center space-x-2">
+                                <i class="fa-solid fa-fire text-amber-500 w-4"></i>
+                                <span>Cấu hình Firebase DB</span>
+                            </span>
+                            <span id="cloud-sync-label" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Cài đặt</span>
+                        </button>
+
+                        <button type="button" onclick="openTrashModal(); closeToolsDropdown();"
+                            class="w-full px-3.5 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between text-slate-700 font-semibold">
+                            <span class="flex items-center space-x-2">
+                                <i class="fa-solid fa-trash-can text-slate-500 w-4"></i>
+                                <span>Thùng rác sự cố</span>
+                            </span>
+                            <span id="trash-count-badge" class="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">0</span>
+                        </button>
+
+                        <div class="my-1 border-t border-slate-100"></div>
+
+                        <button type="button" onclick="exportBackupJSON(); closeToolsDropdown();"
+                            class="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center space-x-2 text-slate-600">
+                            <i class="fa-solid fa-download text-slate-400 w-4"></i>
+                            <span>Tải file sao lưu (.json)</span>
+                        </button>
+
+                        <label class="w-full px-3.5 py-2 text-left hover:bg-slate-50 flex items-center space-x-2 text-slate-600 cursor-pointer">
+                            <i class="fa-solid fa-upload text-slate-400 w-4"></i>
+                            <span>Khôi phục từ file (.json)</span>
+                            <input type="file" id="import-json-input" accept=".json,application/json" class="hidden" onchange="importBackupJSON(event); closeToolsDropdown();">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </header>
+
+    <!-- NỘI DUNG CHÍNH -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-5">
+
+        <!-- ========================================================= -->
+        <!-- TAB 1: BẢNG GIÁM SÁT SỰ CỐ                                -->
+        <!-- ========================================================= -->
+        <div id="view-monitor" class="space-y-4">
+
+            <!-- 4 THẺ THỐNG KÊ GỌN THOÁNG -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+                <div class="bg-white px-4 py-3 rounded-2xl border border-slate-200/90 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold text-slate-400 uppercase">Tổng sự cố</p>
+                        <p id="kpi-total" class="text-xl sm:text-2xl font-bold text-slate-800 mt-0.5">0</p>
+                    </div>
+                    <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <i class="fa-solid fa-layer-group"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white px-4 py-3 rounded-2xl border border-amber-200/90 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold text-amber-600 uppercase">Đang tồn đọng</p>
+                        <p id="kpi-pending" class="text-xl sm:text-2xl font-bold text-amber-600 mt-0.5">0</p>
+                    </div>
+                    <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center">
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white px-4 py-3 rounded-2xl border border-emerald-200/90 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold text-emerald-600 uppercase">Đã khắc phục</p>
+                        <p id="kpi-resolved" class="text-xl sm:text-2xl font-bold text-emerald-600 mt-0.5">0</p>
+                    </div>
+                    <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <i class="fa-solid fa-check"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white px-4 py-3 rounded-2xl border border-purple-200/90 shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-[11px] font-semibold text-purple-600 uppercase">TB Xử lý (MTTR)</p>
+                        <p id="kpi-mttr" class="text-xl sm:text-2xl font-bold text-purple-700 mt-0.5">0 phút</p>
+                    </div>
+                    <div class="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BỐ CỤC CHÍNH: CỘT FORM (4/12) & CỘT BẢNG (8/12) -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+                <!-- CỘT TRÁI: BIỂU MẪU GHI NHẬN SỰ CỐ -->
+                <div id="incident-form-card" class="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div onclick="toggleMobileFormAccordion()" class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between cursor-pointer lg:cursor-default">
+                        <div class="flex items-center space-x-2">
+                            <i class="fa-solid fa-plus-circle text-blue-400"></i>
+                            <h2 id="form-title" class="font-bold text-xs sm:text-sm">Ghi Nhận Sự Cố Mới</h2>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span id="form-mode-badge" class="hidden text-[10px] font-bold bg-amber-400 text-slate-950 px-2 py-0.5 rounded">
+                                Đang sửa
+                            </span>
+                            <button type="button" class="lg:hidden text-xs text-slate-300">
+                                <i id="mobile-form-chevron" class="fa-solid fa-chevron-up"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <form id="incident-form" onsubmit="handleFormSubmit(event)" class="p-4 space-y-3">
+                        <input type="hidden" id="edit-incident-id" value="">
+
+                        <!-- Thời gian xảy ra & tiếp nhận -->
+                        <div class="space-y-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="text-[11px] font-semibold text-slate-600">Thời gian xảy ra lỗi <span class="text-red-500">*</span></label>
+                                    <button type="button" onclick="setNowToField('reportedTime')" class="text-[11px] font-semibold text-blue-600 hover:underline">Bây giờ</button>
+                                </div>
+                                <input type="datetime-local" id="reportedTime" required
+                                    class="block w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="text-[11px] font-semibold text-slate-600">Thời gian IT tiếp nhận <span class="text-red-500">*</span></label>
+                                    <div class="space-x-2">
+                                        <button type="button" onclick="copyReportedToReceived()" class="text-[11px] text-slate-500 hover:text-blue-600">= Giờ báo</button>
+                                        <button type="button" onclick="setNowToField('receivedTime')" class="text-[11px] font-semibold text-blue-600 hover:underline">Bây giờ</button>
+                                    </div>
+                                </div>
+                                <input type="datetime-local" id="receivedTime" required
+                                    class="block w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                        </div>
+
+                        <!-- Khoa & Phòng thực hiện -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="text-xs font-semibold text-slate-700">Khoa <span class="text-red-500">*</span></label>
+                                    <button type="button" onclick="toggleQuickAdd('departments')" class="text-[11px] font-semibold text-blue-600 hover:underline">+ Thêm mới</button>
+                                </div>
+                                <select id="departmentSelect" required class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 outline-none"></select>
+                                <div id="quick-add-departments" class="hidden mt-1.5 flex space-x-1">
+                                    <input type="text" id="quick-input-departments" placeholder="Tên Khoa mới..." onkeydown="if(event.key==='Enter'){event.preventDefault();saveQuickAdd('departments');}" class="flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none">
+                                    <button type="button" onclick="saveQuickAdd('departments')" class="px-2.5 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg">Lưu</button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="text-xs font-semibold text-slate-700">Phòng thực hiện <span class="text-[11px] font-normal text-slate-400">(Tùy chọn)</span></label>
+                                    <button type="button" onclick="toggleQuickAdd('rooms')" class="text-[11px] font-semibold text-blue-600 hover:underline">+ Thêm mới</button>
+                                </div>
+                                <select id="roomSelect" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 outline-none"></select>
+                                <div id="quick-add-rooms" class="hidden mt-1.5 flex space-x-1">
+                                    <input type="text" id="quick-input-rooms" placeholder="Tên Phòng mới..." onkeydown="if(event.key==='Enter'){event.preventDefault();saveQuickAdd('rooms');}" class="flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none">
+                                    <button type="button" onclick="saveQuickAdd('rooms')" class="px-2.5 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg">Lưu</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Loại lỗi & Mức độ ưu tiên -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2.5">
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="text-xs font-semibold text-slate-700">Phân loại lỗi <span class="text-red-500">*</span></label>
+                                    <button type="button" onclick="toggleQuickAdd('categories')" class="text-[11px] font-semibold text-blue-600 hover:underline">+ Thêm mới</button>
+                                </div>
+                                <select id="categorySelect" required class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 outline-none"></select>
+                                <div id="quick-add-categories" class="hidden mt-1.5 flex space-x-1">
+                                    <input type="text" id="quick-input-categories" placeholder="Tên loại lỗi mới..." onkeydown="if(event.key==='Enter'){event.preventDefault();saveQuickAdd('categories');}" class="flex-1 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none">
+                                    <button type="button" onclick="saveQuickAdd('categories')" class="px-2.5 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg">Lưu</button>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Mức ưu tiên</label>
+                                    <select id="prioritySelect" class="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option value="Bình thường">🔵 Bình thường</option>
+                                        <option value="Cao">🟠 Cao</option>
+                                        <option value="Khẩn cấp">🔴 Khẩn cấp</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Người báo <span class="text-red-500">*</span></label>
+                                    <input type="text" id="reporterInput" required placeholder="BS. Nam..."
+                                        class="w-full px-2.5 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mô tả lỗi -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Mô tả chi tiết lỗi <span class="text-red-500">*</span></label>
+                            <textarea id="descriptionInput" rows="2" required placeholder="Nhập triệu chứng lỗi, mã bệnh nhân..."
+                                class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+                        </div>
+
+                        <!-- Đính kèm ảnh gọn nhẹ -->
+                        <div id="photo-dropzone" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDropFiles(event)"
+                            class="p-2.5 bg-slate-50 rounded-xl border border-dashed border-slate-300 transition">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-medium text-slate-600"><i class="fa-regular fa-image text-blue-600 mr-1"></i>Ảnh lỗi (<span id="photo-count-label">0/6</span>)</span>
+                                <div class="flex items-center space-x-1.5">
+                                    <label class="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 text-blue-600 border border-slate-300 text-xs font-semibold cursor-pointer">
+                                        + Chọn ảnh
+                                        <input type="file" accept="image/*" multiple class="hidden" onchange="handlePhotoFiles(event)">
+                                    </label>
+                                    <label class="sm:hidden px-2.5 py-1 rounded-lg bg-blue-600 text-white text-xs font-semibold cursor-pointer">
+                                        <i class="fa-solid fa-camera"></i>
+                                        <input type="file" accept="image/*" capture="environment" class="hidden" onchange="handlePhotoFiles(event)">
+                                    </label>
+                                </div>
+                            </div>
+                            <div id="form-photo-preview" class="hidden grid grid-cols-4 gap-2 pt-2"></div>
+                        </div>
+
+                        <!-- Xử lý của IT: Tình trạng, Giờ xong & Ghi chú -->
+                        <div class="space-y-2.5 pt-2 border-t border-slate-100">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Tình trạng xử lý</label>
+                                <select id="statusSelect" onchange="onStatusSelectChange()"
+                                    class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold focus:ring-2 focus:ring-blue-500 outline-none"></select>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <label class="text-[11px] font-semibold text-slate-600">Thời gian khắc phục xong</label>
+                                    <button type="button" onclick="setResolvedNowInForm()" class="text-[11px] font-semibold text-emerald-600 hover:underline">✓ Xong ngay</button>
+                                </div>
+                                <input type="datetime-local" id="resolvedTime"
+                                    class="block w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Cách xử lý / Ghi chú IT</label>
+                                <input type="text" id="resolutionNotesInput" placeholder="Khởi động lại dịch vụ DICOM, cấu hình lại..."
+                                    class="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            </div>
+                        </div>
+
+                        <!-- Nút Lưu -->
+                        <div class="pt-1 flex items-center space-x-2">
+                            <button type="submit" id="submit-btn"
+                                class="flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-sm transition cursor-pointer flex items-center justify-center space-x-1.5">
+                                <i class="fa-solid fa-check"></i>
+                                <span id="submit-btn-text">Lưu Sự Cố</span>
+                            </button>
+                            <button type="button" id="cancel-edit-btn" onclick="resetIncidentForm()"
+                                class="hidden py-2.5 px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm rounded-xl transition cursor-pointer">
+                                Hủy
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- CỘT PHẢI: DANH SÁCH & BỘ LỌC SỰ CỐ -->
+                <div id="incident-list-card" class="lg:col-span-8 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+                    
+                    <!-- Thanh công cụ tìm kiếm, lọc Ngày/Tháng/Năm & Sắp xếp (Sort) -->
+                    <div class="p-3.5 border-b border-slate-200 bg-slate-50/50 space-y-2.5">
+                        <!-- Hàng 1: Tiêu đề + Lọc nhanh Chưa xong + Tìm kiếm từ khóa -->
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex items-center space-x-2">
+                                <h2 class="font-bold text-sm text-slate-800">Danh Sách Sự Cố</h2>
+                                <span id="filtered-count-badge" class="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">0</span>
+                                <button type="button" id="btn-quick-unresolved" onclick="toggleUnresolvedOnly()"
+                                    class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-slate-600 border border-slate-300 hover:border-amber-400 transition cursor-pointer">
+                                    <span>🔥 Chưa xong</span>
+                                </button>
+                            </div>
+
+                            <div class="flex items-center space-x-2 flex-1 sm:flex-initial justify-end">
+                                <div class="relative flex-1 sm:w-52">
+                                    <i class="fa-solid fa-magnifying-glass text-slate-400 text-xs absolute left-3 top-2.5"></i>
+                                    <input type="text" id="filterSearch" oninput="renderAll()" placeholder="Tìm nhanh..."
+                                        class="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none">
+                                </div>
+                                <button type="button" onclick="clearAllFilters()" title="Đặt lại tất cả bộ lọc & sắp xếp"
+                                    class="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-500 hover:text-blue-600 hover:bg-slate-100 border border-transparent hover:border-slate-200 cursor-pointer">
+                                    <i class="fa-solid fa-filter-circle-xmark mr-1"></i>Đặt lại
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Hàng 2: Lọc theo Ngày / Tháng / Năm & Sắp xếp thứ tự (Sort) -->
+                        <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/60">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="text-[11px] font-bold text-slate-500 uppercase mr-1"><i class="fa-regular fa-calendar-days mr-1"></i>Thời gian:</span>
+                                <!-- Chọn nhanh Hôm nay / Tháng này / Tất cả -->
+                                <button type="button" onclick="setQuickDateFilter('ALL')" id="btn-date-all"
+                                    class="px-2 py-1 rounded-lg text-[11px] font-bold bg-blue-600 text-white cursor-pointer transition">Tất cả</button>
+                                <button type="button" onclick="setQuickDateFilter('TODAY')" id="btn-date-today"
+                                    class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-white text-slate-600 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">Hôm nay</button>
+                                <button type="button" onclick="setQuickDateFilter('MONTH')" id="btn-date-month"
+                                    class="px-2 py-1 rounded-lg text-[11px] font-semibold bg-white text-slate-600 border border-slate-300 hover:bg-slate-100 cursor-pointer transition">Tháng này</button>
+
+                                <!-- Chọn khoảng Từ ngày - Đến ngày (Ngày/Tháng/Năm) -->
+                                <div class="flex items-center space-x-1 bg-white px-2 py-0.5 rounded-lg border border-slate-300 text-xs">
+                                    <input type="date" id="filterDateFrom" onchange="onCustomDateRangeChange()" title="Từ ngày"
+                                        class="bg-transparent text-[11px] text-slate-700 outline-none cursor-pointer">
+                                    <span class="text-slate-400">→</span>
+                                    <input type="date" id="filterDateTo" onchange="onCustomDateRangeChange()" title="Đến ngày"
+                                        class="bg-transparent text-[11px] text-slate-700 outline-none cursor-pointer">
+                                </div>
+                            </div>
+
+                            <!-- Dropdown Sắp xếp (Sort theo Ngày/Tháng/Năm & Mức ưu tiên) -->
+                            <div class="flex items-center space-x-1.5 ml-auto">
+                                <span class="text-[11px] font-bold text-slate-500"><i class="fa-solid fa-arrow-up-wide-short mr-1"></i>Sắp xếp:</span>
+                                <select id="sortOrderSelect" onchange="renderAll()"
+                                    class="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
+                                    <option value="DATE_DESC">📅 Mới nhất trước (Giảm dần)</option>
+                                    <option value="DATE_ASC">📅 Cũ nhất trước (Tăng dần)</option>
+                                    <option value="PRIORITY_DESC">🔥 Khẩn cấp & Chưa xong lên đầu</option>
+                                    <option value="MTTR_DESC">⏱ Thời gian xử lý lâu nhất</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Hàng 3: 4 Dropdown lọc Khoa, Phòng, Loại lỗi, Tình trạng -->
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <select id="filterDepartment" onchange="renderAll()" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none">
+                                <option value="ALL">Tất cả Khoa</option>
+                            </select>
+                            <select id="filterRoom" onchange="renderAll()" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none">
+                                <option value="ALL">Tất cả Phòng</option>
+                            </select>
+                            <select id="filterCategory" onchange="renderAll()" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none">
+                                <option value="ALL">Tất cả Loại lỗi</option>
+                            </select>
+                            <select id="filterStatus" onchange="renderAll()" class="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs outline-none">
+                                <option value="ALL">Tất cả Tình trạng</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- DANH SÁCH THẺ TRÊN ĐIỆN THOẠI (< 768px) -->
+                    <div id="incident-mobile-cards" class="md:hidden divide-y divide-slate-100"></div>
+
+                    <!-- BẢNG TRÊN MÁY TÍNH (>= 768px) -->
+                    <div class="hidden md:block overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase border-b border-slate-200 select-none">
+                                    <th onclick="toggleDateSortFromHeader()" class="py-3 px-3.5 cursor-pointer hover:text-blue-600 transition" title="Nhấp để đảo chiều sắp xếp theo Ngày/Tháng/Năm">
+                                        <span>Khoa / Phòng & Thời gian</span>
+                                        <i id="th-sort-icon" class="fa-solid fa-sort-down ml-1 text-blue-600"></i>
+                                    </th>
+                                    <th class="py-3 px-3.5">Nội dung sự cố</th>
+                                    <th class="py-3 px-3.5">Tiếp nhận & Xử lý</th>
+                                    <th class="py-3 px-3.5">Tình trạng</th>
+                                    <th class="py-3 px-3.5 text-right w-24">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incident-table-body" class="divide-y divide-slate-100 text-xs sm:text-sm"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Trạng thái trống -->
+                    <div id="empty-state" class="hidden py-14 px-4 text-center">
+                        <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-2.5 text-lg">
+                            <i class="fa-regular fa-clipboard"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700">Chưa có sự cố nào</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Hãy thêm sự cố ở khung bên trái hoặc đổi bộ lọc tìm kiếm.</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- TAB 2: THỐNG KÊ SỐ LIỆU (THEO TUẦN / THÁNG / NĂM)          -->
+        <!-- ========================================================= -->
+        <div id="view-stats" class="hidden space-y-5">
+
+            <!-- THANH ĐIỀU KHIỂN CHU KỲ THỐNG KÊ (TUẦN / THÁNG / NĂM) -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-base shrink-0">
+                        <i class="fa-solid fa-chart-pie"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-900">Báo Cáo & Thống Kê Số Liệu PACS</h2>
+                        <p id="stats-period-subtext" class="text-xs text-slate-500">Phân tích tần suất sự cố, thời gian xử lý và tỷ trọng theo Khoa / Phòng</p>
+                    </div>
+                </div>
+
+                <!-- Cụm nút chọn: Theo Tuần | Theo Tháng | Theo Năm | Tất cả + Điều hướng ◀ ▶ -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                        <button type="button" id="stats-mode-week" onclick="setStatsGranularity('WEEK')"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition cursor-pointer">
+                            Theo Tuần
+                        </button>
+                        <button type="button" id="stats-mode-month" onclick="setStatsGranularity('MONTH')"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer">
+                            Theo Tháng
+                        </button>
+                        <button type="button" id="stats-mode-year" onclick="setStatsGranularity('YEAR')"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer">
+                            Theo Năm
+                        </button>
+                        <button type="button" id="stats-mode-all" onclick="setStatsGranularity('ALL')"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer">
+                            Tất cả
+                        </button>
+                    </div>
+
+                    <!-- Điều hướng kỳ trước / kỳ sau -->
+                    <div id="stats-nav-controls" class="inline-flex items-center bg-white border border-slate-200 rounded-xl px-1.5 py-1 shadow-sm">
+                        <button type="button" onclick="stepStatsPeriod(-1)" title="Kỳ trước"
+                            class="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center text-xs cursor-pointer">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <span id="stats-current-label" class="px-3 text-xs font-bold text-slate-800 min-w-[140px] text-center select-none">
+                            Tuần này
+                        </span>
+                        <button type="button" onclick="stepStatsPeriod(1)" title="Kỳ tiếp theo"
+                            class="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-600 flex items-center justify-center text-xs cursor-pointer">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                        <button type="button" onclick="resetStatsPeriodToNow()" title="Quay về hiện tại"
+                            class="ml-1 px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 text-[11px] font-bold cursor-pointer">
+                            Hiện tại
+                        </button>
+                    </div>
+
+                    <!-- Xuất báo cáo kỳ đang xem ra Excel -->
+                    <button type="button" onclick="exportStatsSummaryCSV()"
+                        class="inline-flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm cursor-pointer">
+                        <i class="fa-solid fa-file-arrow-down"></i>
+                        <span>Xuất Thống Kê (.csv)</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4 THẺ CHỈ SỐ KPI CỦA KỲ ĐANG CHỌN -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase">Tổng số sự cố</span>
+                        <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs"><i class="fa-solid fa-bolt-lightning"></i></span>
+                    </div>
+                    <p id="stat-kpi-total" class="text-2xl font-bold text-slate-900 mt-1">0</p>
+                    <p id="stat-kpi-priority-sub" class="text-[11px] text-slate-500 mt-1">0 Khẩn cấp • 0 Cao</p>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl border border-emerald-200 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold text-emerald-600 uppercase">Tỷ lệ hoàn thành</span>
+                        <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs"><i class="fa-solid fa-circle-check"></i></span>
+                    </div>
+                    <p id="stat-kpi-rate" class="text-2xl font-bold text-emerald-600 mt-1">0%</p>
+                    <p id="stat-kpi-resolved-sub" class="text-[11px] text-slate-500 mt-1">0 đã xong / 0 tồn đọng</p>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl border border-indigo-200 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold text-indigo-600 uppercase">TB Phản hồi tiếp nhận</span>
+                        <span class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs"><i class="fa-solid fa-headset"></i></span>
+                    </div>
+                    <p id="stat-kpi-response" class="text-2xl font-bold text-indigo-700 mt-1">0 phút</p>
+                    <p class="text-[11px] text-slate-500 mt-1">Từ lúc xảy ra → IT tiếp nhận</p>
+                </div>
+
+                <div class="bg-white p-4 rounded-2xl border border-purple-200 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold text-purple-600 uppercase">TB Khắc phục (MTTR)</span>
+                        <span class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xs"><i class="fa-solid fa-stopwatch"></i></span>
+                    </div>
+                    <p id="stat-kpi-mttr" class="text-2xl font-bold text-purple-700 mt-1">0 phút</p>
+                    <p id="stat-kpi-mttr-sub" class="text-[11px] text-slate-500 mt-1">Nhanh nhất: — | Lâu nhất: —</p>
+                </div>
+            </div>
+
+            <!-- BIỂU ĐỒ XU HƯỚNG THEO THỜI GIAN (TREND BAR CHART) -->
+            <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h3 id="stats-trend-title" class="text-sm font-bold text-slate-900">Biểu Đồ Xu Hướng Sự Cố</h3>
+                        <p class="text-xs text-slate-500">Số lượng sự cố phát sinh và đã khắc phục theo mốc thời gian</p>
+                    </div>
+                    <div class="flex items-center space-x-4 text-xs font-semibold">
+                        <span class="flex items-center space-x-1.5 text-slate-600">
+                            <span class="w-3 h-3 rounded-sm bg-blue-500 inline-block"></span>
+                            <span>Tổng phát sinh</span>
+                        </span>
+                        <span class="flex items-center space-x-1.5 text-slate-600">
+                            <span class="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span>
+                            <span>Đã khắc phục</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Vùng vẽ biểu đồ cột -->
+                <div id="stats-trend-chart" class="pt-4 pb-1 overflow-x-auto"></div>
+            </div>
+
+            <!-- PHÂN TÍCH TỶ TRỌNG: THEO KHOA | THEO LOẠI LỖI | THEO PHÒNG MÁY -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <!-- Cột 1: Top Khoa phát sinh sự cố -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <h3 class="text-sm font-bold text-slate-900"><i class="fa-solid fa-hospital text-blue-600 mr-1.5"></i>Thống Kê Theo Khoa</h3>
+                        <span class="text-[11px] font-semibold text-slate-400">Số ca & Tỷ lệ</span>
+                    </div>
+                    <div id="stats-by-department" class="divide-y divide-slate-100 flex-1 max-h-80 overflow-y-auto pr-1 mt-1"></div>
+                </div>
+
+                <!-- Cột 2: Top Phân loại lỗi PACS -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <h3 class="text-sm font-bold text-slate-900"><i class="fa-solid fa-screwdriver-wrench text-purple-600 mr-1.5"></i>Theo Phân Loại Lỗi</h3>
+                        <span class="text-[11px] font-semibold text-slate-400">Số ca & Tỷ lệ</span>
+                    </div>
+                    <div id="stats-by-category" class="divide-y divide-slate-100 flex-1 max-h-80 overflow-y-auto pr-1 mt-1"></div>
+                </div>
+
+                <!-- Cột 3: Top Phòng thực hiện / Thiết bị -->
+                <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <h3 class="text-sm font-bold text-slate-900"><i class="fa-solid fa-door-open text-amber-600 mr-1.5"></i>Theo Phòng Thực Hiện</h3>
+                        <span class="text-[11px] font-semibold text-slate-400">Số ca & Tỷ lệ</span>
+                    </div>
+                    <div id="stats-by-room" class="divide-y divide-slate-100 flex-1 max-h-80 overflow-y-auto pr-1 mt-1"></div>
+                </div>
+            </div>
+
+            <!-- BẢNG TỔNG HỢP CHI TIẾT THEO KHOA TRONG KỲ -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-900">Bảng Tổng Hợp Chi Tiết Theo Khoa</h3>
+                        <p class="text-xs text-slate-500">Đánh giá khối lượng sự cố và tốc độ xử lý trung bình (MTTR) của từng Khoa trong kỳ</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase border-b border-slate-200">
+                                <th class="py-3 px-4">Khoa</th>
+                                <th class="py-3 px-4 text-center">Tổng số ca</th>
+                                <th class="py-3 px-4 text-center">Đã khắc phục</th>
+                                <th class="py-3 px-4 text-center">Đang tồn đọng</th>
+                                <th class="py-3 px-4 text-center">Ca Khẩn cấp</th>
+                                <th class="py-3 px-4 text-right">MTTR Trung bình</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stats-detail-table-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- TAB 3: QUẢN LÝ DANH MỤC (4 NHÓM RỘNG RÃI, RÕ CHỮ)          -->
+        <!-- ========================================================= -->
+        <div id="view-config" class="hidden space-y-4">
+            
+            <!-- Header Tab Danh mục -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">Quản Lý Danh Mục Hệ Thống</h2>
+                    <p class="text-xs text-slate-500">Chọn nhóm danh mục bên trái để thêm, sửa tên hoặc sắp xếp thứ tự hiển thị.</p>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button type="button" onclick="resetAllConfigToDefault()"
+                        class="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer">
+                        <i class="fa-solid fa-rotate-left mr-1"></i> Mặc định
+                    </button>
+                    <button type="button" onclick="switchTab('monitor')"
+                        class="px-3.5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition cursor-pointer">
+                        ← Quay lại Bảng Sự Cố
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bố cục 2 phần: Menu chọn 4 nhóm danh mục (3/12) + Khung danh sách rộng rãi (9/12) -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                
+                <!-- Cột chọn Nhóm Danh Mục -->
+                <div class="md:col-span-4 lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-2 space-y-1">
+                    <button type="button" onclick="selectConfigCategory('departments')" id="cfg-tab-departments"
+                        class="w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs sm:text-sm font-bold bg-blue-50 text-blue-700 transition cursor-pointer">
+                        <span class="flex items-center space-x-2.5">
+                            <i class="fa-solid fa-hospital w-4 text-center"></i>
+                            <span>1. Khoa (Bắt buộc)</span>
+                        </span>
+                        <span id="config-count-departments" class="px-2 py-0.5 text-xs rounded-full bg-blue-600 text-white">0</span>
+                    </button>
+
+                    <button type="button" onclick="selectConfigCategory('rooms')" id="cfg-tab-rooms"
+                        class="w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+                        <span class="flex items-center space-x-2.5">
+                            <i class="fa-solid fa-door-open w-4 text-center"></i>
+                            <span>2. Phòng thực hiện</span>
+                        </span>
+                        <span id="config-count-rooms" class="px-2 py-0.5 text-xs rounded-full bg-slate-200 text-slate-700">0</span>
+                    </button>
+
+                    <button type="button" onclick="selectConfigCategory('categories')" id="cfg-tab-categories"
+                        class="w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+                        <span class="flex items-center space-x-2.5">
+                            <i class="fa-solid fa-screwdriver-wrench w-4 text-center"></i>
+                            <span>3. Phân loại lỗi PACS</span>
+                        </span>
+                        <span id="config-count-categories" class="px-2 py-0.5 text-xs rounded-full bg-slate-200 text-slate-700">0</span>
+                    </button>
+
+                    <button type="button" onclick="selectConfigCategory('statuses')" id="cfg-tab-statuses"
+                        class="w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer">
+                        <span class="flex items-center space-x-2.5">
+                            <i class="fa-solid fa-spinner w-4 text-center"></i>
+                            <span>4. Tình trạng xử lý</span>
+                        </span>
+                        <span id="config-count-statuses" class="px-2 py-0.5 text-xs rounded-full bg-slate-200 text-slate-700">0</span>
+                    </button>
+                </div>
+
+                <!-- Khung hiển thị & chỉnh sửa chi tiết của Nhóm đang chọn -->
+                <div class="md:col-span-8 lg:col-span-9 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <h3 id="active-config-title" class="font-bold text-sm sm:text-base text-slate-900">🏥 Danh sách Khoa</h3>
+                            <p id="active-config-subtitle" class="text-xs text-slate-500">Các khoa dùng để chọn khi ghi nhận sự cố.</p>
+                        </div>
+
+                        <!-- Form thêm mục mới rộng rãi -->
+                        <form onsubmit="addActiveConfigItem(event)" class="flex items-center space-x-2 sm:w-80">
+                            <input type="text" id="active-config-input" required placeholder="Nhập tên mục mới..."
+                                class="flex-1 px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                            <button type="submit"
+                                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-sm shrink-0 cursor-pointer">
+                                + Thêm mới
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Danh sách các mục -->
+                    <ul id="active-config-list" class="divide-y divide-slate-100 p-3 space-y-1.5 max-h-[540px] overflow-y-auto"></ul>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ========================================================= -->
+    <!-- MODAL CẤU HÌNH GOOGLE FIREBASE & SNAPSHOT RECOVERY        -->
+    <!-- ========================================================= -->
+    <div id="firebase-modal" class="fixed inset-0 z-50 bg-slate-900/60 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-lg">
+                        <i class="fa-solid fa-fire"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-slate-900">Kết Nối Google Firebase</h3>
+                        <p class="text-xs text-slate-500">Đồng bộ dữ liệu thời gian thực & Tự động lưu bản sao dự phòng</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeFirebaseModal()" class="text-slate-400 hover:text-slate-600 text-lg cursor-pointer">✕</button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">1. Firebase Database URL <span class="text-red-500">*</span></label>
+                    <input type="url" id="fb-url-input" placeholder="https://du-an-cua-ban-default-rtdb.asia-southeast1.firebasedatabase.app"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">2. Mã Kênh Bí Mật (Secret Key)</label>
+                    <input type="text" id="fb-path-input" placeholder="VD: pacs_it_secret_8899"
+                        class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-amber-500">
+                </div>
+            </div>
+
+            <!-- Khôi phục bản Snapshot dự phòng -->
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-2">
+                <div class="text-xs text-emerald-900">
+                    <p class="font-bold">🛡️ Khôi phục từ bản Snapshot dự phòng</p>
+                    <p class="text-[11px] text-emerald-700">Khôi phục lại bản sao lưu gần nhất trên Cloud nếu dữ liệu bị xóa nhầm.</p>
+                </div>
+                <button type="button" onclick="restoreFromCloudSnapshot()"
+                    class="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 cursor-pointer">
+                    ⏪ Khôi phục
+                </button>
+            </div>
+
+            <!-- Khung log trực tiếp -->
+            <div class="p-3 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-1">
+                <div class="flex items-center justify-between border-b border-slate-700 pb-1">
+                    <span class="text-slate-400">Trạng thái:</span>
+                    <span id="fb-status-badge" class="text-amber-400 font-bold">Chưa kết nối</span>
+                </div>
+                <div class="text-slate-300 max-h-20 overflow-y-auto space-y-0.5" id="fb-console-log">
+                    <p class="text-slate-400">> Sẵn sàng kết nối...</p>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-between pt-1">
+                <button type="button" onclick="disconnectFirebase()" id="btn-fb-disconnect"
+                    class="hidden text-xs font-bold text-red-600 hover:underline cursor-pointer">
+                    Ngắt kết nối
+                </button>
+                <div class="flex items-center space-x-2 ml-auto">
+                    <button type="button" onclick="closeFirebaseModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 cursor-pointer">
+                        Đóng
+                    </button>
+                    <button type="button" onclick="saveAndConnectFirebase()" class="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer">
+                        Lưu & Kết Nối
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL THÙNG RÁC -->
+    <div id="trash-modal" class="fixed inset-0 z-50 bg-slate-900/60 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-slate-200 space-y-4 max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                        <i class="fa-solid fa-trash-arrow-up"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base text-slate-900">Thùng Rác Sự Cố</h3>
+                        <p class="text-xs text-slate-500">Khôi phục lại sự cố bị xóa nhầm hoặc xóa vĩnh viễn (cần PIN Admin).</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeTrashModal()" class="text-slate-400 hover:text-slate-600 text-lg cursor-pointer">✕</button>
+            </div>
+
+            <div id="trash-list-container" class="flex-1 overflow-y-auto divide-y divide-slate-100 space-y-2 pr-1"></div>
+
+            <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                <button type="button" onclick="emptyTrashWithPin()"
+                    class="px-3.5 py-2 rounded-xl text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 cursor-pointer">
+                    🔒 Dọn sạch thùng rác
+                </button>
+                <button type="button" onclick="closeTrashModal()"
+                    class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-white cursor-pointer">
+                    Đóng
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LIGHTBOX XEM ẢNH -->
+    <div id="lightbox-modal" class="fixed inset-0 z-50 bg-slate-950/90 hidden items-center justify-center p-4">
+        <div class="max-w-4xl w-full bg-slate-900 rounded-2xl overflow-hidden border border-slate-700 shadow-2xl">
+            <div class="px-4 py-3 bg-slate-800 flex items-center justify-between text-white">
+                <span id="lightbox-caption" class="text-xs sm:text-sm font-semibold">Ảnh minh chứng</span>
+                <div class="flex items-center space-x-2">
+                    <a id="lightbox-download" href="#" download="minh-chung-pacs.jpg"
+                        class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold">Tải ảnh</a>
+                    <button type="button" onclick="closeLightbox()" class="w-8 h-8 rounded-lg bg-slate-700 text-white font-bold cursor-pointer">✕</button>
+                </div>
+            </div>
+            <div class="relative bg-black flex items-center justify-center min-h-[300px] max-h-[75vh]">
+                <button type="button" onclick="stepLightbox(-1)" class="absolute left-3 w-10 h-10 rounded-full bg-slate-800/80 text-white flex items-center justify-center cursor-pointer">❮</button>
+                <img id="lightbox-img" src="" alt="Minh chứng" class="max-h-[72vh] max-w-full object-contain">
+                <button type="button" onclick="stepLightbox(1)" class="absolute right-3 w-10 h-10 rounded-full bg-slate-800/80 text-white flex items-center justify-center cursor-pointer">❯</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL SỬA TÊN DANH MỤC -->
+    <div id="rename-modal" class="fixed inset-0 z-50 bg-slate-900/60 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-base text-slate-900">Đổi tên danh mục</h3>
+                <button type="button" onclick="closeRenameModal()" class="text-slate-400 hover:text-slate-600">✕</button>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Tên mới:</label>
+                <input type="text" id="rename-modal-input" onkeydown="if(event.key==='Enter'){event.preventDefault();confirmRenameConfigItem();}"
+                    class="w-full px-3.5 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <label class="flex items-start space-x-2.5 p-3 rounded-xl bg-blue-50 border border-blue-200 text-xs text-slate-700 cursor-pointer">
+                <input type="checkbox" id="rename-cascade-check" checked class="mt-0.5 rounded text-blue-600">
+                <span>Cập nhật tự động các sự cố cũ đang dùng mục này (<strong id="rename-usage-count" class="text-blue-700">0</strong> sự cố)</span>
+            </label>
+            <div class="flex justify-end space-x-2">
+                <button type="button" onclick="closeRenameModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700">Hủy</button>
+                <button type="button" onclick="confirmRenameConfigItem()" class="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 text-white">Lưu tên mới</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL XÁC NHẬN CHUYỂN VÀO THÙNG RÁC -->
+    <div id="delete-modal" class="fixed inset-0 z-50 bg-slate-900/60 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl border border-slate-200 space-y-4 text-center">
+            <div class="w-11 h-11 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto text-base">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <h3 class="font-bold text-base text-slate-900">Chuyển vào Thùng rác?</h3>
+            <p class="text-xs text-slate-500">Sự cố sẽ được chuyển vào Thùng rác và có thể khôi phục lại bất cứ lúc nào.</p>
+            <div class="flex justify-center space-x-2">
+                <button type="button" onclick="closeDeleteModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 cursor-pointer">Hủy</button>
+                <button type="button" onclick="confirmSoftDeleteIncident()" class="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer">Đồng ý</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NHẬP MÃ PIN ADMIN -->
+    <div id="admin-pin-modal" class="fixed inset-0 z-50 bg-slate-900/70 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-lg shrink-0">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-sm text-slate-900">Xác Thực Mã PIN Admin</h3>
+                    <p id="admin-pin-reason" class="text-xs text-slate-500">Nhập Mã PIN Quản trị để thực hiện thao tác này.</p>
+                </div>
+            </div>
+            <input type="password" id="admin-pin-input" placeholder="Nhập Mã PIN..."
+                onkeydown="if(event.key==='Enter'){event.preventDefault();submitAdminPinModal();}"
+                class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-center text-base font-bold tracking-widest outline-none focus:ring-2 focus:ring-red-500">
+            <div class="flex justify-end space-x-2">
+                <button type="button" onclick="closeAdminPinModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 cursor-pointer">Hủy</button>
+                <button type="button" onclick="submitAdminPinModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white cursor-pointer">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- THÔNG BÁO TOAST -->
+    <div id="toast-box" class="fixed bottom-20 sm:bottom-5 right-4 left-4 sm:left-auto z-50 hidden items-center justify-center sm:justify-start space-x-2.5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg text-xs font-semibold">
+        <i class="fa-solid fa-circle-check text-emerald-400 text-sm shrink-0"></i>
+        <span id="toast-message">Đã lưu thành công!</span>
+    </div>
+
+    <!-- THANH ĐIỀU HƯỚNG DƯỚI ĐÁY CHO ĐIỆN THOẠI (4 NÚT) -->
+    <nav class="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 px-2 py-1.5 flex items-center justify-around shadow-lg">
+        <button type="button" onclick="mobileNavAction('list')" id="mnav-list"
+            class="flex flex-col items-center justify-center py-1 px-2.5 rounded-xl text-blue-600 font-bold text-[11px]">
+            <i class="fa-solid fa-table-list text-base mb-0.5"></i>
+            <span>Sự cố (<span id="mnav-badge-count">0</span>)</span>
+        </button>
+
+        <button type="button" onclick="mobileNavAction('add')" id="mnav-add"
+            class="flex items-center space-x-1 bg-blue-600 text-white font-bold text-xs px-3.5 py-2.5 rounded-2xl shadow-md -mt-4 border-4 border-slate-100">
+            <i class="fa-solid fa-plus"></i>
+            <span>Ghi Nhận</span>
+        </button>
+
+        <button type="button" onclick="mobileNavAction('stats')" id="mnav-stats"
+            class="flex flex-col items-center justify-center py-1 px-2.5 rounded-xl text-slate-500 font-semibold text-[11px]">
+            <i class="fa-solid fa-chart-column text-base mb-0.5"></i>
+            <span>Thống kê</span>
+        </button>
+
+        <button type="button" onclick="mobileNavAction('config')" id="mnav-config"
+            class="flex flex-col items-center justify-center py-1 px-2.5 rounded-xl text-slate-500 font-semibold text-[11px]">
+            <i class="fa-solid fa-sliders text-base mb-0.5"></i>
+            <span>Danh mục</span>
+        </button>
+    </nav>
+
+    <!-- ========================================================================= -->
+    <!-- MÃ NGUỒN JAVASCRIPT CHÍNH (ĐÃ TỐI ƯU HÓA & GHI CHÚ RÕ RÀNG TỪNG PHẦN)     -->
+    <!-- ========================================================================= -->
+    <script>
+        /* =========================================================================
+         * PHẦN 1: CẤU HÌNH HỆ THỐNG & BIẾN TOÀN CỤC (SYSTEM CONFIG & GLOBAL STATE)
+         * - Bạn có thể điền trực tiếp link Firebase vào DEFAULT_FIREBASE_URL để các
+         *   máy trong Ban IT mở lên là tự động kết nối không cần nhập tay.
+         * ========================================================================= */
+        const DEFAULT_FIREBASE_URL = 'https://pacs-error-list-default-rtdb.asia-southeast1.firebasedatabase.app/';                // Điền link Firebase Realtime Database của bạn vào đây
+        const DEFAULT_FIREBASE_PATH = ''; // Tên nhánh (Secret Channel) lưu dữ liệu trên Firebase
+        const ADMIN_PIN = '140904';                       // Mã PIN Quản trị dùng khi xóa vĩnh viễn / khôi phục gốc
+
+        // Khóa lưu cấu hình kết nối Firebase trên trình duyệt
+        const FB_URL_KEY = 'pacs_fb_database_url';
+        const FB_PATH_KEY = 'pacs_fb_storage_path';
+
+        // Biến trạng thái dữ liệu ứng dụng (4 nhóm danh mục: Khoa, Phòng, Loại lỗi, Tình trạng)
+        let incidents = [];
+        let configData = { departments: [], rooms: [], categories: [], statuses: [] };
+        let activeConfigKey = 'departments';
+        let formPhotos = [];
+        let lightboxState = { photos: [], index: 0, title: '' };
+        let deleteTargetId = null;
+        let renameState = { listKey: null, index: null };
+        let isMobileFormCollapsed = false;
+        let showUnresolvedOnly = false;
+        let activeQuickDateMode = 'ALL'; // 'ALL' | 'TODAY' | 'MONTH' | 'CUSTOM'
+
+        // Biến trạng thái cho Tab Thống kê (Tuần / Tháng / Năm / Tất cả)
+        let statsGranularity = 'WEEK'; // 'WEEK' | 'MONTH' | 'YEAR' | 'ALL'
+        let statsAnchorDate = new Date();
+
+        // Biến bảo vệ chống ghi đè dữ liệu rỗng (Anti-Wipe)
+        let hasLoadedFromCloudAtLeastOnce = false;
+        let lastKnownCloudCount = 0;
+        let pendingPinCallback = null;
+
+        // Thông tin kết nối Firebase hiện hành
+        let firebaseDbUrl = '';
+        let firebasePath = '';
+
+        // Thông tin tiêu đề hiển thị cho 4 nhóm danh mục ở Tab Config
+        const CONFIG_META = {
+            departments: {
+                title: '🏥 1. Danh mục Khoa',
+                subtitle: 'Danh sách các Khoa trong bệnh viện có phát sinh sự cố PACS.',
+                placeholder: 'Nhập tên Khoa mới'
+            },
+            rooms: {
+                title: '🚪 2. Danh mục Phòng thực hiện',
+                subtitle: 'Danh sách các phòng máy chụp X-Quang, CT, MRI, Siêu âm...',
+                placeholder: 'Nhập tên Phòng thực hiện mới'
+            },
+            categories: {
+                title: '🛠️ 3. Danh mục Phân loại lỗi PACS',
+                subtitle: 'Nhóm nguyên nhân hoặc triệu chứng sự cố thường gặp.',
+                placeholder: 'Nhập loại lỗi PACS mới...'
+            },
+            statuses: {
+                title: '⏳ 4. Danh mục Tình trạng xử lý',
+                subtitle: 'Trạng thái theo dõi tiến độ khắc phục sự cố của Ban IT.',
+                placeholder: 'Nhập trạng thái xử lý mới...'
+            }
+        };
+
+        /* =========================================================================
+         * PHẦN 2: QUẢN LÝ MENU CÔNG CỤ & XÁC THỰC MÃ PIN ADMIN (SECURITY & PIN)
+         * ========================================================================= */
+        function toggleToolsDropdown(e) {
+            e.stopPropagation();
+            const menu = document.getElementById('tools-dropdown-menu');
+            if (menu) menu.classList.toggle('hidden');
+        }
+
+        function closeToolsDropdown() {
+            const menu = document.getElementById('tools-dropdown-menu');
+            if (menu) menu.classList.add('hidden');
+        }
+
+        window.addEventListener('click', () => closeToolsDropdown());
+
+        function requireAdminPin(reasonText, onSuccessCallback) {
+            pendingPinCallback = onSuccessCallback;
+            document.getElementById('admin-pin-reason').textContent = reasonText || 'Nhập Mã PIN Quản trị để tiếp tục.';
+            const input = document.getElementById('admin-pin-input');
+            input.value = '';
+            const modal = document.getElementById('admin-pin-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => input.focus(), 50);
+        }
+
+        function closeAdminPinModal() {
+            pendingPinCallback = null;
+            const modal = document.getElementById('admin-pin-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function submitAdminPinModal() {
+            const entered = document.getElementById('admin-pin-input').value.trim();
+            if (entered === ADMIN_PIN) {
+                const cb = pendingPinCallback;
+                closeAdminPinModal();
+                if (typeof cb === 'function') cb();
+            } else {
+                showToast('✕ Sai Mã PIN Admin!');
+                document.getElementById('admin-pin-input').value = '';
+            }
+        }
+
+        /* =========================================================================
+         * PHẦN 3: KHỞI TẠO DỮ LIỆU MẶC ĐỊNH & CHUẨN HÓA (DATA INITIALIZATION)
+         * ========================================================================= */
+        function getDefaultConfig() {
+            return {
+                departments: [
+                    'Khoa Chẩn Đoán Hình Ảnh'
+                ],
+                rooms: [
+                    'Phòng X-Quang 1'
+                ],
+                categories: [
+                    'Lỗi kết nối DICOM / Network'
+                ],
+                statuses: ['Đang xử lý', 'Đã khắc phục', 'Chờ hãng hỗ trợ']
+            };
+        }
+
+        function normalizeAndMigrateData(rawIncidents, rawConfig) {
+            const def = getDefaultConfig();
+            let migratedChanged = false;
+
+            const newConfig = {
+                departments: (rawConfig && Array.isArray(rawConfig.departments) && rawConfig.departments.length)
+                    ? [...rawConfig.departments]
+                    : [...def.departments],
+                rooms: [],
+                categories: (rawConfig && Array.isArray(rawConfig.categories) && rawConfig.categories.length)
+                    ? [...rawConfig.categories]
+                    : [...def.categories],
+                statuses: (rawConfig && Array.isArray(rawConfig.statuses) && rawConfig.statuses.length)
+                    ? [...rawConfig.statuses]
+                    : [...def.statuses]
+            };
+
+            if (rawConfig && Array.isArray(rawConfig.rooms) && rawConfig.rooms.length) {
+                newConfig.rooms = [...rawConfig.rooms];
+            } else if (rawConfig && Array.isArray(rawConfig.locations) && rawConfig.locations.length) {
+                newConfig.rooms = [...rawConfig.locations];
+                migratedChanged = true;
+            } else {
+                newConfig.rooms = [...def.rooms];
+            }
+
+            if (rawConfig && Array.isArray(rawConfig.locations)) {
+                rawConfig.locations.forEach(loc => {
+                    if (loc && !newConfig.rooms.includes(loc)) {
+                        newConfig.rooms.push(loc);
+                        migratedChanged = true;
+                    }
+                });
+            }
+
+            const defaultDept = newConfig.departments[0] || 'Khoa Chẩn Đoán Hình Ảnh';
+
+            const newIncidents = (Array.isArray(rawIncidents) ? rawIncidents : []).map(item => {
+                const copy = { ...item };
+                if (copy.room === undefined) {
+                    copy.room = copy.location || '';
+                    migratedChanged = true;
+                }
+                if (!copy.department) {
+                    copy.department = defaultDept;
+                    migratedChanged = true;
+                }
+                if (copy.receivedTime === undefined) {
+                    copy.receivedTime = copy.reportedTime || '';
+                    migratedChanged = true;
+                }
+                if (copy.status !== 'Đã khắc phục' && copy.resolvedTime) {
+                    copy.resolvedTime = '';
+                    migratedChanged = true;
+                }
+                if (!copy.priority) copy.priority = 'Bình thường';
+                if (copy.deleted === undefined) copy.deleted = false;
+                if (copy.location !== undefined) {
+                    delete copy.location;
+                    migratedChanged = true;
+                }
+                if (copy.assignee !== undefined) {
+                    delete copy.assignee;
+                }
+                if (copy.room && !newConfig.rooms.includes(copy.room)) {
+                    newConfig.rooms.push(copy.room);
+                    migratedChanged = true;
+                }
+                return copy;
+            });
+
+            return { newIncidents, newConfig, migratedChanged };
+        }
+
+        function syncMissingValuesIntoConfig() {
+            const def = getDefaultConfig();
+            if (!configData || typeof configData !== 'object') {
+                configData = getDefaultConfig();
+            }
+            ['departments', 'rooms', 'categories', 'statuses'].forEach(k => {
+                if (!Array.isArray(configData[k]) || !configData[k].length) {
+                    configData[k] = [...def[k]];
+                }
+            });
+
+            incidents.forEach(inc => {
+                if (inc.department && !configData.departments.includes(inc.department)) configData.departments.push(inc.department);
+                if (inc.room && !configData.rooms.includes(inc.room)) configData.rooms.push(inc.room);
+                if (inc.category && !configData.categories.includes(inc.category)) configData.categories.push(inc.category);
+                if (inc.status && !configData.statuses.includes(inc.status)) configData.statuses.push(inc.status);
+            });
+        }
+
+        function purgeLocalMachineStorage() {
+            try {
+                localStorage.removeItem('pacs_desktop_incidents');
+                localStorage.removeItem('pacs_desktop_config');
+                localStorage.removeItem('pacs_incidents_v3');
+                localStorage.removeItem('pacs_config_v3');
+                window.name = '';
+            } catch (e) {}
+        }
+
+        async function initAppData() {
+            purgeLocalMachineStorage();
+            configData = getDefaultConfig();
+            incidents = [];
+
+            try {
+                firebaseDbUrl = localStorage.getItem(FB_URL_KEY) || DEFAULT_FIREBASE_URL || '';
+                firebasePath = localStorage.getItem(FB_PATH_KEY) || DEFAULT_FIREBASE_PATH || 'pacs_main_data';
+            } catch (e) {
+                firebaseDbUrl = DEFAULT_FIREBASE_URL || '';
+                firebasePath = DEFAULT_FIREBASE_PATH || 'pacs_main_data';
+            }
+
+            renderDropdownsInFormAndFilter();
+            renderConfigTabLists();
+            resetIncidentForm();
+            renderAll();
+
+            if (firebaseDbUrl) {
+                updateFirebaseBadge(true);
+                await fetchFromFirebase(false);
+            } else {
+                updateFirebaseBadge(false);
+                setCloudStatusIndicator('idle', 'Chưa kết nối DB');
+            }
+        }
+
+        /* =========================================================================
+         * PHẦN 4: HÀM TIỆN ÍCH THỜI GIAN & FORMAT NGÀY THÁNG (DATE/TIME HELPERS)
+         * ========================================================================= */
+        function getLocalISOString(offsetMinutes = 0) {
+            const d = new Date(Date.now() + offsetMinutes * 60000);
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        }
+
+        function getTodayDateString() {
+            const d = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+        }
+
+        function getCurrentHMS() {
+            const d = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        function formatDisplayDateTime(isoStr) {
+            if (!isoStr) return '—';
+            const d = new Date(isoStr);
+            if (isNaN(d.getTime())) return isoStr;
+            const pad = n => String(n).padStart(2, '0');
+            return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+        }
+
+        function calcDurationMinutes(startStr, endStr) {
+            if (!startStr || !endStr) return null;
+            const s = new Date(startStr).getTime();
+            const e = new Date(endStr).getTime();
+            if (isNaN(s) || isNaN(e) || e < s) return null;
+            return Math.round((e - s) / 60000);
+        }
+
+        function setNowToField(id) {
+            document.getElementById(id).value = getLocalISOString(0);
+        }
+
+        function copyReportedToReceived() {
+            const rep = document.getElementById('reportedTime').value;
+            document.getElementById('receivedTime').value = rep || getLocalISOString(0);
+        }
+
+        function setResolvedNowInForm() {
+            document.getElementById('resolvedTime').value = getLocalISOString(0);
+            document.getElementById('statusSelect').value = 'Đã khắc phục';
+        }
+
+        function escapeHTML(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        /* =========================================================================
+         * PHẦN 5: KẾT NỐI ĐÁM MÂY GOOGLE FIREBASE & SNAPSHOT DỰ PHÒNG (CLOUD SYNC)
+         * ========================================================================= */
+        function addFbLog(msg, color = 'text-slate-300') {
+            const logBox = document.getElementById('fb-console-log');
+            if (!logBox) return;
+            const p = document.createElement('p');
+            p.className = color;
+            p.textContent = `[${getCurrentHMS()}] ${msg}`;
+            logBox.appendChild(p);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function setCloudStatusIndicator(state, message) {
+            const dot = document.getElementById('save-status-dot');
+            const text = document.getElementById('save-status-text');
+            if (!dot || !text) return;
+            text.textContent = message;
+            if (state === 'ok') {
+                dot.className = 'w-2 h-2 rounded-full bg-emerald-500 shrink-0';
+                text.className = 'text-[11px] font-medium text-emerald-700 truncate';
+            } else if (state === 'syncing') {
+                dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0';
+                text.className = 'text-[11px] font-medium text-amber-700 truncate';
+            } else if (state === 'error') {
+                dot.className = 'w-2 h-2 rounded-full bg-red-500 shrink-0';
+                text.className = 'text-[11px] font-medium text-red-600 truncate';
+            } else {
+                dot.className = 'w-2 h-2 rounded-full bg-slate-400 shrink-0';
+                text.className = 'text-[11px] font-medium text-slate-500 truncate';
+            }
+        }
+
+        function cleanFirebaseUrl(url) {
+            let u = (url || '').trim();
+            if (u.endsWith('/')) u = u.slice(0, -1);
+            return u;
+        }
+
+        function getFirebaseEndpoint(suffix = '') {
+            const cleanUrl = cleanFirebaseUrl(firebaseDbUrl);
+            const path = (firebasePath || 'pacs_main_data').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+            return `${cleanUrl}/${path}${suffix}.json`;
+        }
+
+        async function saveCloudSnapshotIfValid(bundle) {
+            if (!firebaseDbUrl || !bundle || !Array.isArray(bundle.incidents) || bundle.incidents.length === 0) return;
+            try {
+                const snapEndpoint = getFirebaseEndpoint('_backup_snapshot');
+                await fetch(snapEndpoint, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...bundle, snapshotAt: new Date().toISOString() })
+                });
+            } catch (e) {}
+        }
+
+        async function restoreFromCloudSnapshot() {
+            if (!firebaseDbUrl) {
+                showToast('Vui lòng kết nối Firebase trước!');
+                return;
+            }
+            requireAdminPin('Nhập Mã PIN Admin để khôi phục từ bản Snapshot trên Cloud:', async () => {
+                try {
+                    const snapEndpoint = getFirebaseEndpoint('_backup_snapshot');
+                    const res = await fetch(snapEndpoint);
+                    if (!res.ok) {
+                        showToast('Không đọc được bản Snapshot!');
+                        return;
+                    }
+                    const data = await res.json();
+                    if (!data || !Array.isArray(data.incidents) || data.incidents.length === 0) {
+                        showToast('Chưa có bản Snapshot nào trên Cloud!');
+                        return;
+                    }
+                    const { newIncidents, newConfig } = normalizeAndMigrateData(data.incidents, data.configData);
+                    incidents = newIncidents;
+                    configData = newConfig;
+                    lastKnownCloudCount = incidents.length;
+                    syncMissingValuesIntoConfig();
+                    renderDropdownsInFormAndFilter();
+                    renderConfigTabLists();
+                    renderAll();
+                    await saveAllState(true, true);
+                    showToast(`✓ Đã khôi phục ${incidents.length} sự cố từ Snapshot!`);
+                } catch (err) {
+                    showToast('Lỗi khi khôi phục Snapshot!');
+                }
+            });
+        }
+
+        async function saveAllState(syncToCloud = true, bypassAntiWipe = false) {
+            if (!syncToCloud) return;
+
+            if (!firebaseDbUrl) {
+                setCloudStatusIndicator('error', 'Chưa cài Firebase');
+                showToast('⚠️ Bạn chưa cài đặt Firebase DB!');
+                openFirebaseModal();
+                return;
+            }
+
+            if (!bypassAntiWipe && incidents.length === 0 && lastKnownCloudCount > 0) {
+                setCloudStatusIndicator('error', 'Đã chặn ghi đè rỗng!');
+                showToast('🛡️ Đã chặn ghi đè rỗng để bảo vệ dữ liệu!');
+                return;
+            }
+
+            const savedAt = getCurrentHMS();
+            const bundle = {
+                incidents,
+                configData,
+                savedAt,
+                updatedAt: new Date().toISOString()
+            };
+
+            setCloudStatusIndicator('syncing', 'Đang lưu...');
+            const ok = await pushToFirebase(bundle);
+            if (ok) {
+                lastKnownCloudCount = incidents.length;
+                if (incidents.length > 0) saveCloudSnapshotIfValid(bundle);
+                setCloudStatusIndicator('ok', `Đã lưu ${savedAt}`);
+            } else {
+                setCloudStatusIndicator('error', 'Lỗi lưu DB');
+            }
+        }
+
+        async function pushToFirebase(bundle) {
+            if (!firebaseDbUrl) return false;
+            try {
+                const endpoint = getFirebaseEndpoint();
+                const res = await fetch(endpoint, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bundle)
+                });
+                if (res.ok) {
+                    addFbLog(`✓ Đã đồng bộ ${bundle.incidents.length} sự cố.`, 'text-emerald-400 font-bold');
+                    return true;
+                }
+                return false;
+            } catch (err) {
+                return false;
+            }
+        }
+
+        async function fetchFromFirebase(showToastMsg = true) {
+            if (!firebaseDbUrl) {
+                if (showToastMsg) openFirebaseModal();
+                return;
+            }
+            const pullIcon = document.getElementById('cloud-pull-icon');
+            if (pullIcon) pullIcon.className = 'fa-solid fa-rotate fa-spin';
+            setCloudStatusIndicator('syncing', 'Đang tải...');
+
+            try {
+                const endpoint = getFirebaseEndpoint();
+                const res = await fetch(endpoint);
+                if (res.ok) {
+                    const data = await res.json();
+                    hasLoadedFromCloudAtLeastOnce = true;
+                    if (data && typeof data === 'object') {
+                        const { newIncidents, newConfig, migratedChanged } = normalizeAndMigrateData(data.incidents, data.configData);
+                        incidents = newIncidents;
+                        configData = newConfig;
+                        lastKnownCloudCount = incidents.length;
+
+                        syncMissingValuesIntoConfig();
+                        renderDropdownsInFormAndFilter();
+                        renderConfigTabLists();
+                        renderAll();
+
+                        if (migratedChanged) await saveAllState(true, true);
+                        else setCloudStatusIndicator('ok', `Đã đồng bộ ${getCurrentHMS()}`);
+
+                        const activeCount = incidents.filter(i => !i.deleted).length;
+                        if (showToastMsg) showToast(`✓ Đã tải ${activeCount} sự cố từ Firebase!`);
+                    } else {
+                        incidents = [];
+                        lastKnownCloudCount = 0;
+                        configData = getDefaultConfig();
+                        renderDropdownsInFormAndFilter();
+                        renderConfigTabLists();
+                        renderAll();
+                        setCloudStatusIndicator('ok', `DB trống (${getCurrentHMS()})`);
+                    }
+                } else {
+                    setCloudStatusIndicator('error', 'Lỗi đọc DB');
+                }
+            } catch (err) {
+                setCloudStatusIndicator('error', 'Lỗi kết nối DB');
+            } finally {
+                if (pullIcon) pullIcon.className = 'fa-solid fa-rotate';
+            }
+        }
+
+        function openFirebaseModal() {
+            document.getElementById('fb-url-input').value = firebaseDbUrl;
+            document.getElementById('fb-path-input').value = firebasePath || 'pacs_main_data';
+            const disBtn = document.getElementById('btn-fb-disconnect');
+            const statusEl = document.getElementById('fb-status-badge');
+
+            if (firebaseDbUrl) {
+                disBtn.classList.remove('hidden');
+                statusEl.className = 'text-emerald-400 font-bold';
+                statusEl.textContent = '✓ Đã kết nối';
+            } else {
+                disBtn.classList.add('hidden');
+                statusEl.className = 'text-amber-400 font-bold';
+                statusEl.textContent = 'Chưa kết nối';
+            }
+
+            const modal = document.getElementById('firebase-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeFirebaseModal() {
+            const modal = document.getElementById('firebase-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function updateFirebaseBadge(isOnline) {
+            const label = document.getElementById('cloud-sync-label');
+            if (!label) return;
+            if (isOnline && firebaseDbUrl) {
+                label.textContent = 'Đã kết nối';
+                label.className = 'text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold';
+            } else {
+                label.textContent = 'Chưa cài';
+                label.className = 'text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-bold';
+            }
+        }
+
+        async function manualPushToFirebase() {
+            if (!firebaseDbUrl) {
+                openFirebaseModal();
+                return;
+            }
+            try {
+                const res = await fetch(getFirebaseEndpoint());
+                if (res.ok) {
+                    const cloudData = await res.json();
+                    const cloudCount = (cloudData && Array.isArray(cloudData.incidents)) ? cloudData.incidents.length : 0;
+                    if (cloudCount > incidents.length) {
+                        requireAdminPin(`Trên DB đang có ${cloudCount} sự cố (máy bạn có ${incidents.length}). Nhập PIN Admin nếu muốn ghi đè:`, async () => {
+                            await executeManualPush();
+                        });
+                        return;
+                    }
+                }
+            } catch (e) {}
+            await executeManualPush();
+        }
+
+        async function executeManualPush() {
+            const icon = document.getElementById('cloud-push-icon');
+            if (icon) icon.className = 'fa-solid fa-spinner fa-spin';
+            setCloudStatusIndicator('syncing', 'Đang sao lưu...');
+
+            const savedAt = getCurrentHMS();
+            const bundle = { incidents, configData, savedAt, updatedAt: new Date().toISOString() };
+            const ok = await pushToFirebase(bundle);
+            if (icon) icon.className = 'fa-solid fa-cloud-arrow-up';
+            if (ok) {
+                lastKnownCloudCount = incidents.length;
+                if (incidents.length > 0) saveCloudSnapshotIfValid(bundle);
+                setCloudStatusIndicator('ok', `Đã lưu ${savedAt}`);
+                showToast('✓ Đã sao lưu lên Firebase Database!');
+            } else {
+                setCloudStatusIndicator('error', 'Lỗi sao lưu');
+                showToast('✕ Sao lưu thất bại!');
+            }
+        }
+
+        async function saveAndConnectFirebase() {
+            const url = document.getElementById('fb-url-input').value.trim();
+            const path = document.getElementById('fb-path-input').value.trim() || 'pacs_main_data';
+            if (!url) {
+                showToast('Vui lòng nhập Database URL!');
+                return;
+            }
+            firebaseDbUrl = url;
+            firebasePath = path;
+            try {
+                localStorage.setItem(FB_URL_KEY, firebaseDbUrl);
+                localStorage.setItem(FB_PATH_KEY, firebasePath);
+            } catch (e) {}
+            updateFirebaseBadge(true);
+            await fetchFromFirebase(true);
+            closeFirebaseModal();
+        }
+
+        function disconnectFirebase() {
+            firebaseDbUrl = '';
+            try {
+                localStorage.removeItem(FB_URL_KEY);
+                localStorage.removeItem(FB_PATH_KEY);
+            } catch (e) {}
+            updateFirebaseBadge(false);
+            setCloudStatusIndicator('idle', 'Đã ngắt DB');
+            closeFirebaseModal();
+            showToast('Đã ngắt kết nối Firebase.');
+        }
+
+        /* =========================================================================
+         * PHẦN 6: ĐIỀU HƯỚNG 3 TAB & GIAO DIỆN ĐIỆN THOẠI (NAVIGATION & MOBILE UI)
+         * ========================================================================= */
+        function toggleMobileFormAccordion(forceOpen) {
+            if (window.innerWidth >= 1024) return;
+            const form = document.getElementById('incident-form');
+            const chevron = document.getElementById('mobile-form-chevron');
+            if (!form) return;
+
+            if (forceOpen === true) isMobileFormCollapsed = false;
+            else if (forceOpen === false) isMobileFormCollapsed = true;
+            else isMobileFormCollapsed = !isMobileFormCollapsed;
+
+            if (isMobileFormCollapsed) {
+                form.classList.add('hidden');
+                if (chevron) chevron.className = 'fa-solid fa-chevron-down';
+            } else {
+                form.classList.remove('hidden');
+                if (chevron) chevron.className = 'fa-solid fa-chevron-up';
+            }
+        }
+
+        function mobileNavAction(action) {
+            const mList = document.getElementById('mnav-list');
+            const mStats = document.getElementById('mnav-stats');
+            const mConfig = document.getElementById('mnav-config');
+            const activeCls = 'flex flex-col items-center justify-center py-1 px-2.5 rounded-xl text-blue-600 font-bold text-[11px]';
+            const normalCls = 'flex flex-col items-center justify-center py-1 px-2.5 rounded-xl text-slate-500 font-semibold text-[11px]';
+
+            if (action === 'config') {
+                switchTab('config');
+                if (mConfig) mConfig.className = activeCls;
+                if (mList) mList.className = normalCls;
+                if (mStats) mStats.className = normalCls;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else if (action === 'stats') {
+                switchTab('stats');
+                if (mStats) mStats.className = activeCls;
+                if (mList) mList.className = normalCls;
+                if (mConfig) mConfig.className = normalCls;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else if (action === 'add') {
+                switchTab('monitor');
+                toggleMobileFormAccordion(true);
+                if (mList) mList.className = activeCls;
+                if (mStats) mStats.className = normalCls;
+                if (mConfig) mConfig.className = normalCls;
+                const formCard = document.getElementById('incident-form-card');
+                if (formCard) formCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                switchTab('monitor');
+                if (mList) mList.className = activeCls;
+                if (mStats) mStats.className = normalCls;
+                if (mConfig) mConfig.className = normalCls;
+                const listCard = document.getElementById('incident-list-card');
+                if (listCard) listCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+
+        function switchTab(tabName) {
+            const vMonitor = document.getElementById('view-monitor');
+            const vStats = document.getElementById('view-stats');
+            const vConfig = document.getElementById('view-config');
+
+            const bMonitor = document.getElementById('tab-btn-monitor');
+            const bStats = document.getElementById('tab-btn-stats');
+            const bConfig = document.getElementById('tab-btn-config');
+
+            const activeBtnCls = 'inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition cursor-pointer';
+            const inactiveBtnCls = 'inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer';
+
+            vMonitor.classList.add('hidden');
+            vStats.classList.add('hidden');
+            vConfig.classList.add('hidden');
+
+            if (bMonitor) bMonitor.className = inactiveBtnCls;
+            if (bStats) bStats.className = inactiveBtnCls;
+            if (bConfig) bConfig.className = inactiveBtnCls;
+
+            if (tabName === 'config') {
+                vConfig.classList.remove('hidden');
+                if (bConfig) bConfig.className = activeBtnCls;
+                renderConfigTabLists();
+            } else if (tabName === 'stats') {
+                vStats.classList.remove('hidden');
+                if (bStats) bStats.className = activeBtnCls;
+                renderStatsTab();
+            } else {
+                vMonitor.classList.remove('hidden');
+                if (bMonitor) bMonitor.className = activeBtnCls;
+                renderDropdownsInFormAndFilter();
+                renderAll();
+            }
+        }
+
+        /* =========================================================================
+         * PHẦN 7: QUẢN LÝ 4 NHÓM DANH MỤC (CONFIG DROPDOWN - BỐ CỤC 2 CỘT RỘNG RÃI)
+         * ========================================================================= */
+        function selectConfigCategory(key) {
+            activeConfigKey = key;
+            renderConfigTabLists();
+        }
+
+        function renderConfigTabLists() {
+            const keys = ['departments', 'rooms', 'categories', 'statuses'];
+            const icons = {
+                departments: 'fa-hospital',
+                rooms: 'fa-door-open',
+                categories: 'fa-screwdriver-wrench',
+                statuses: 'fa-spinner'
+            };
+            const labels = {
+                departments: '1. Khoa',
+                rooms: '2. Phòng thực hiện',
+                categories: '3. Phân loại lỗi PACS',
+                statuses: '4. Tình trạng xử lý'
+            };
+
+            if (!keys.includes(activeConfigKey)) {
+                activeConfigKey = 'departments';
+            }
+
+            keys.forEach(k => {
+                const count = (configData[k] || []).length;
+                const btn = document.getElementById(`cfg-tab-${k}`);
+                if (!btn) return;
+                const isSelected = (k === activeConfigKey);
+                btn.className = isSelected
+                    ? 'w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs sm:text-sm font-bold bg-blue-600 text-white shadow-sm transition cursor-pointer'
+                    : 'w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer';
+
+                btn.innerHTML = `
+                    <span class="flex items-center space-x-2.5 truncate">
+                        <i class="fa-solid ${icons[k]} w-4 text-center"></i>
+                        <span class="truncate">${labels[k]}</span>
+                    </span>
+                    <span class="px-2 py-0.5 text-xs font-bold rounded-full ${isSelected ? 'bg-blue-800 text-white' : 'bg-slate-200 text-slate-700'}">${count}</span>
+                `;
+            });
+
+            const meta = CONFIG_META[activeConfigKey] || CONFIG_META.departments;
+            document.getElementById('active-config-title').textContent = meta.title;
+            document.getElementById('active-config-subtitle').textContent = meta.subtitle;
+            document.getElementById('active-config-input').placeholder = meta.placeholder;
+
+            const items = configData[activeConfigKey] || [];
+            const ulEl = document.getElementById('active-config-list');
+            if (!ulEl) return;
+
+            if (!items.length) {
+                ulEl.innerHTML = `<li class="py-8 text-center text-xs text-slate-400">Chưa có mục nào trong danh sách này.</li>`;
+                return;
+            }
+
+            ulEl.innerHTML = items.map((name, idx) => {
+                const used = countUsageInIncidents(activeConfigKey, name);
+                return `
+                    <li class="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-50/70 hover:bg-blue-50/40 border border-slate-200/80 transition">
+                        <div class="flex items-center space-x-3 min-w-0 pr-3">
+                            <span class="w-6 h-6 rounded-lg bg-white border border-slate-200 text-slate-500 text-xs font-bold flex items-center justify-center shrink-0">${idx + 1}</span>
+                            <span class="text-sm font-semibold text-slate-800 break-words">${escapeHTML(name)}</span>
+                            <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full ${used > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-200/70 text-slate-500'} shrink-0">
+                                ${used} sự cố
+                            </span>
+                        </div>
+                        <div class="flex items-center space-x-1.5 shrink-0">
+                            <button type="button" onclick="moveConfigItem('${activeConfigKey}', ${idx}, -1)" ${idx === 0 ? 'disabled' : ''}
+                                class="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-900 disabled:opacity-30 text-xs flex items-center justify-center cursor-pointer" title="Chuyển lên">
+                                <i class="fa-solid fa-arrow-up"></i>
+                            </button>
+                            <button type="button" onclick="moveConfigItem('${activeConfigKey}', ${idx}, 1)" ${idx === items.length - 1 ? 'disabled' : ''}
+                                class="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-900 disabled:opacity-30 text-xs flex items-center justify-center cursor-pointer" title="Chuyển xuống">
+                                <i class="fa-solid fa-arrow-down"></i>
+                            </button>
+                            <button type="button" onclick="openRenameModal('${activeConfigKey}', ${idx})"
+                                class="px-2.5 py-1 rounded-lg bg-white hover:bg-blue-50 text-blue-600 border border-blue-200 text-xs font-semibold cursor-pointer">
+                                <i class="fa-solid fa-pen mr-1"></i>Sửa tên
+                            </button>
+                            <button type="button" onclick="removeConfigItem('${activeConfigKey}', ${idx})"
+                                class="px-2.5 py-1 rounded-lg bg-white hover:bg-red-50 text-red-600 border border-red-200 text-xs font-semibold cursor-pointer" title="Yêu cầu Mã PIN Admin">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+        }
+
+        function addActiveConfigItem(e) {
+            e.preventDefault();
+            const input = document.getElementById('active-config-input');
+            const val = (input ? input.value : '').trim();
+            if (!val) return;
+            if (configData[activeConfigKey].includes(val)) {
+                showToast('Mục này đã có trong danh sách!');
+                return;
+            }
+            configData[activeConfigKey].push(val);
+            input.value = '';
+            saveAllState(true);
+            renderConfigTabLists();
+            renderDropdownsInFormAndFilter();
+            showToast(`✓ Đã thêm "${val}"!`);
+        }
+
+        function renderDropdownsInFormAndFilter(selDept, selRoom, selCat, selStatus) {
+            const deptEl = document.getElementById('departmentSelect');
+            const roomEl = document.getElementById('roomSelect');
+            const catEl = document.getElementById('categorySelect');
+            const statusEl = document.getElementById('statusSelect');
+
+            const curDept = selDept !== undefined ? selDept : (deptEl ? deptEl.value : '');
+            const curRoom = selRoom !== undefined ? selRoom : (roomEl ? roomEl.value : '');
+            const curCat = selCat !== undefined ? selCat : (catEl ? catEl.value : '');
+            const curStatus = selStatus !== undefined ? selStatus : (statusEl ? statusEl.value : '');
+
+            if (deptEl) {
+                deptEl.innerHTML = configData.departments.map(i => `<option value="${escapeHTML(i)}">${escapeHTML(i)}</option>`).join('');
+                if (configData.departments.includes(curDept)) deptEl.value = curDept;
+            }
+            if (roomEl) {
+                roomEl.innerHTML = `<option value="">— Không chọn phòng —</option>` +
+                    configData.rooms.map(i => `<option value="${escapeHTML(i)}">${escapeHTML(i)}</option>`).join('');
+                roomEl.value = (curRoom && configData.rooms.includes(curRoom)) ? curRoom : '';
+            }
+            if (catEl) {
+                catEl.innerHTML = configData.categories.map(i => `<option value="${escapeHTML(i)}">${escapeHTML(i)}</option>`).join('');
+                if (configData.categories.includes(curCat)) catEl.value = curCat;
+            }
+            if (statusEl) {
+                statusEl.innerHTML = configData.statuses.map(i => `<option value="${escapeHTML(i)}">${escapeHTML(i)}</option>`).join('');
+                if (configData.statuses.includes(curStatus)) statusEl.value = curStatus;
+            }
+
+            const fDept = document.getElementById('filterDepartment');
+            const fRoom = document.getElementById('filterRoom');
+            const fCat = document.getElementById('filterCategory');
+            const fSt = document.getElementById('filterStatus');
+
+            if (fDept) {
+                const prev = fDept.value || 'ALL';
+                fDept.innerHTML = `<option value="ALL">Tất cả Khoa</option>` + configData.departments.map(d => `<option value="${escapeHTML(d)}">${escapeHTML(d)}</option>`).join('');
+                fDept.value = configData.departments.includes(prev) ? prev : 'ALL';
+            }
+            if (fRoom) {
+                const prev = fRoom.value || 'ALL';
+                fRoom.innerHTML = `<option value="ALL">Tất cả Phòng</option><option value="NONE">Chưa chọn phòng</option>` +
+                    configData.rooms.map(r => `<option value="${escapeHTML(r)}">${escapeHTML(r)}</option>`).join('');
+                fRoom.value = (prev === 'NONE' || configData.rooms.includes(prev)) ? prev : 'ALL';
+            }
+            if (fCat) {
+                const prev = fCat.value || 'ALL';
+                fCat.innerHTML = `<option value="ALL">Tất cả Loại lỗi</option>` + configData.categories.map(c => `<option value="${escapeHTML(c)}">${escapeHTML(c)}</option>`).join('');
+                fCat.value = configData.categories.includes(prev) ? prev : 'ALL';
+            }
+            if (fSt) {
+                const prev = fSt.value || 'ALL';
+                fSt.innerHTML = `<option value="ALL">Tất cả Tình trạng</option>` + configData.statuses.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
+                fSt.value = configData.statuses.includes(prev) ? prev : 'ALL';
+            }
+        }
+
+        function toggleQuickAdd(listKey) {
+            const box = document.getElementById(`quick-add-${listKey}`);
+            const input = document.getElementById(`quick-input-${listKey}`);
+            if (!box) return;
+            box.classList.toggle('hidden');
+            if (!box.classList.contains('hidden') && input) input.focus();
+        }
+
+        function saveQuickAdd(listKey) {
+            const input = document.getElementById(`quick-input-${listKey}`);
+            const val = (input ? input.value : '').trim();
+            if (!val) return;
+            if (!configData[listKey].includes(val)) configData[listKey].push(val);
+            input.value = '';
+            document.getElementById(`quick-add-${listKey}`).classList.add('hidden');
+            saveAllState(true);
+            renderDropdownsInFormAndFilter(
+                listKey === 'departments' ? val : undefined,
+                listKey === 'rooms' ? val : undefined,
+                listKey === 'categories' ? val : undefined,
+                listKey === 'statuses' ? val : undefined
+            );
+            renderConfigTabLists();
+            showToast(`✓ Đã thêm "${val}"!`);
+        }
+
+        function countUsageInIncidents(listKey, itemName) {
+            const fieldMap = { departments: 'department', rooms: 'room', categories: 'category', statuses: 'status' };
+            const field = fieldMap[listKey];
+            return incidents.filter(inc => !inc.deleted && inc[field] === itemName).length;
+        }
+
+        function moveConfigItem(listKey, index, dir) {
+            const arr = configData[listKey];
+            const target = index + dir;
+            if (target < 0 || target >= arr.length) return;
+            const temp = arr[index];
+            arr[index] = arr[target];
+            arr[target] = temp;
+            saveAllState(true);
+            renderConfigTabLists();
+            renderDropdownsInFormAndFilter();
+        }
+
+        function removeConfigItem(listKey, index) {
+            if (configData[listKey].length <= 1) {
+                showToast('Phải giữ lại ít nhất 1 mục!');
+                return;
+            }
+            const targetName = configData[listKey][index];
+            requireAdminPin(`Nhập Mã PIN Admin để xóa mục "${targetName}":`, () => {
+                const removed = configData[listKey].splice(index, 1)[0];
+                saveAllState(true);
+                renderConfigTabLists();
+                renderDropdownsInFormAndFilter();
+                showToast(`✓ Đã xóa "${removed}".`);
+            });
+        }
+
+        function openRenameModal(listKey, index) {
+            renameState = { listKey, index };
+            const curName = configData[listKey][index];
+            document.getElementById('rename-modal-input').value = curName;
+            document.getElementById('rename-usage-count').textContent = countUsageInIncidents(listKey, curName);
+            document.getElementById('rename-cascade-check').checked = true;
+            document.getElementById('rename-modal').classList.remove('hidden');
+            document.getElementById('rename-modal').classList.add('flex');
+        }
+
+        function closeRenameModal() {
+            document.getElementById('rename-modal').classList.add('hidden');
+            document.getElementById('rename-modal').classList.remove('flex');
+        }
+
+        function confirmRenameConfigItem() {
+            const { listKey, index } = renameState;
+            if (!listKey || index === null) return;
+            const newName = document.getElementById('rename-modal-input').value.trim();
+            if (!newName) return;
+
+            const oldName = configData[listKey][index];
+            configData[listKey][index] = newName;
+
+            if (document.getElementById('rename-cascade-check').checked) {
+                const fieldMap = { departments: 'department', rooms: 'room', categories: 'category', statuses: 'status' };
+                const field = fieldMap[listKey];
+                incidents.forEach(inc => {
+                    if (inc[field] === oldName) inc[field] = newName;
+                });
+            }
+
+            closeRenameModal();
+            saveAllState(true);
+            renderConfigTabLists();
+            renderDropdownsInFormAndFilter();
+            renderAll();
+            showToast(`✓ Đã đổi tên thành "${newName}"!`);
+        }
+
+        function resetAllConfigToDefault() {
+            requireAdminPin('Nhập Mã PIN Admin để khôi phục danh mục mặc định:', () => {
+                configData = getDefaultConfig();
+                syncMissingValuesIntoConfig();
+                saveAllState(true);
+                renderConfigTabLists();
+                renderDropdownsInFormAndFilter();
+                renderAll();
+                showToast('✓ Đã khôi phục danh mục mặc định!');
+            });
+        }
+
+        /* =========================================================================
+         * PHẦN 8: XỬ LÝ ẢNH ĐÍNH KÈM & DÁN ẢNH TỪ CLIPBOARD (IMAGE COMPRESSION)
+         * ========================================================================= */
+        function compressImageFile(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const maxDim = 800;
+                        let w = img.width, h = img.height;
+                        if (w > h && w > maxDim) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                        else if (h > maxDim) { w = Math.round((w * maxDim) / h); h = maxDim; }
+                        canvas.width = w;
+                        canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        resolve(canvas.toDataURL('image/jpeg', 0.6));
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function processSelectedFiles(fileList) {
+            const files = Array.from(fileList || []).filter(f => f.type && f.type.startsWith('image/'));
+            for (const file of files) {
+                if (formPhotos.length >= 6) break;
+                const compressed = await compressImageFile(file);
+                if (compressed) formPhotos.push(compressed);
+            }
+            renderFormPhotoPreviews();
+        }
+
+        async function handlePhotoFiles(event) {
+            await processSelectedFiles(event.target.files);
+            event.target.value = '';
+        }
+
+        function handleDragOver(e) { e.preventDefault(); }
+        function handleDragLeave(e) { e.preventDefault(); }
+        async function handleDropFiles(e) {
+            e.preventDefault();
+            if (e.dataTransfer && e.dataTransfer.files) await processSelectedFiles(e.dataTransfer.files);
+        }
+
+        window.addEventListener('paste', async (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData || {}).items || [];
+            for (const item of items) {
+                if (item.type && item.type.indexOf('image') !== -1) {
+                    const file = item.getAsFile();
+                    if (file && formPhotos.length < 6) {
+                        const compressed = await compressImageFile(file);
+                        if (compressed) {
+                            formPhotos.push(compressed);
+                            renderFormPhotoPreviews();
+                            showToast('✓ Đã dán ảnh từ Clipboard!');
+                        }
+                    }
+                }
+            }
+        });
+
+        function renderFormPhotoPreviews() {
+            const container = document.getElementById('form-photo-preview');
+            const label = document.getElementById('photo-count-label');
+            if (label) label.textContent = `${formPhotos.length}/6`;
+            if (!container) return;
+            if (!formPhotos.length) {
+                container.classList.add('hidden');
+                container.innerHTML = '';
+                return;
+            }
+            container.classList.remove('hidden');
+            container.innerHTML = formPhotos.map((src, idx) => `
+                <div class="relative rounded-lg overflow-hidden border border-slate-300 aspect-square bg-slate-900">
+                    <img src="${src}" class="w-full h-full object-cover cursor-pointer" onclick="openLightboxForForm(${idx})">
+                    <button type="button" onclick="removeFormPhoto(${idx})"
+                        class="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function removeFormPhoto(idx) {
+            formPhotos.splice(idx, 1);
+            renderFormPhotoPreviews();
+        }
+
+        /* =========================================================================
+         * PHẦN 9: THÊM, SỬA, ĐÁNH DẤU XONG & THÙNG RÁC SỰ CỐ (INCIDENT CRUD)
+         * ========================================================================= */
+        function onStatusSelectChange() {
+            const st = document.getElementById('statusSelect').value;
+            const resEl = document.getElementById('resolvedTime');
+            resEl.value = (st === 'Đã khắc phục') ? getLocalISOString(0) : '';
+        }
+
+        function resetIncidentForm() {
+            document.getElementById('edit-incident-id').value = '';
+            const nowStr = getLocalISOString(0);
+            document.getElementById('reportedTime').value = nowStr;
+            document.getElementById('receivedTime').value = nowStr;
+            document.getElementById('prioritySelect').value = 'Bình thường';
+            document.getElementById('reporterInput').value = '';
+            document.getElementById('descriptionInput').value = '';
+            document.getElementById('resolvedTime').value = '';
+            document.getElementById('resolutionNotesInput').value = '';
+            formPhotos = [];
+            renderFormPhotoPreviews();
+            renderDropdownsInFormAndFilter(configData.departments[0], '', configData.categories[0], 'Đang xử lý');
+
+            document.getElementById('form-title').textContent = 'Ghi Nhận Sự Cố Mới';
+            document.getElementById('submit-btn-text').textContent = 'Lưu Sự Cố';
+            document.getElementById('form-mode-badge').classList.add('hidden');
+            document.getElementById('cancel-edit-btn').classList.add('hidden');
+        }
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            if (firebaseDbUrl && !hasLoadedFromCloudAtLeastOnce) {
+                await fetchFromFirebase(false);
+            }
+
+            const editId = document.getElementById('edit-incident-id').value;
+            const reportedTime = document.getElementById('reportedTime').value;
+            const receivedTime = document.getElementById('receivedTime').value || reportedTime;
+            const department = document.getElementById('departmentSelect').value;
+            const room = document.getElementById('roomSelect').value;
+            const category = document.getElementById('categorySelect').value;
+            const priority = document.getElementById('prioritySelect').value || 'Bình thường';
+            const reporter = document.getElementById('reporterInput').value.trim();
+            const description = document.getElementById('descriptionInput').value.trim();
+            const status = document.getElementById('statusSelect').value;
+            let resolvedTime = document.getElementById('resolvedTime').value;
+            const resolutionNotes = document.getElementById('resolutionNotesInput').value.trim();
+
+            if (status === 'Đã khắc phục') {
+                if (!resolvedTime) resolvedTime = getLocalISOString(0);
+            } else {
+                resolvedTime = '';
+            }
+
+            const record = {
+                id: editId || ('INC-' + Date.now().toString().slice(-6)),
+                reportedTime,
+                receivedTime,
+                department,
+                room: room || '',
+                category,
+                priority,
+                reporter,
+                description,
+                status,
+                resolvedTime,
+                resolutionNotes,
+                deleted: false,
+                photos: [...formPhotos]
+            };
+
+            if (editId) {
+                const idx = incidents.findIndex(i => i.id === editId);
+                if (idx !== -1) incidents[idx] = record;
+                showToast('✓ Đã cập nhật sự cố!');
+            } else {
+                incidents.unshift(record);
+                showToast('✓ Đã thêm sự cố mới!');
+            }
+
+            saveAllState(true);
+            resetIncidentForm();
+            renderAll();
+        }
+
+        function editIncident(id) {
+            const item = incidents.find(i => i.id === id);
+            if (!item) return;
+
+            switchTab('monitor');
+            toggleMobileFormAccordion(true);
+            document.getElementById('edit-incident-id').value = item.id;
+            document.getElementById('reportedTime').value = item.reportedTime || '';
+            document.getElementById('receivedTime').value = item.receivedTime || item.reportedTime || '';
+            renderDropdownsInFormAndFilter(item.department, item.room || '', item.category, item.status);
+            document.getElementById('prioritySelect').value = item.priority || 'Bình thường';
+            document.getElementById('reporterInput').value = item.reporter || '';
+            document.getElementById('descriptionInput').value = item.description || '';
+            document.getElementById('resolvedTime').value = (item.status === 'Đã khắc phục') ? (item.resolvedTime || '') : '';
+            document.getElementById('resolutionNotesInput').value = item.resolutionNotes || '';
+            formPhotos = Array.isArray(item.photos) ? [...item.photos] : [];
+            renderFormPhotoPreviews();
+
+            document.getElementById('form-title').textContent = 'Sửa Sự Cố #' + item.id;
+            document.getElementById('submit-btn-text').textContent = 'Cập Nhật';
+            document.getElementById('form-mode-badge').classList.remove('hidden');
+            document.getElementById('cancel-edit-btn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function markResolvedQuick(id) {
+            const item = incidents.find(i => i.id === id);
+            if (!item) return;
+            item.status = 'Đã khắc phục';
+            item.resolvedTime = getLocalISOString(0);
+            saveAllState(true);
+            renderAll();
+            showToast('✓ Đã đánh dấu khắc phục xong!');
+        }
+
+        function openDeleteModal(id) {
+            deleteTargetId = id;
+            document.getElementById('delete-modal').classList.remove('hidden');
+            document.getElementById('delete-modal').classList.add('flex');
+        }
+
+        function closeDeleteModal() {
+            deleteTargetId = null;
+            document.getElementById('delete-modal').classList.add('hidden');
+            document.getElementById('delete-modal').classList.remove('flex');
+        }
+
+        function confirmSoftDeleteIncident() {
+            if (!deleteTargetId) return;
+            const target = incidents.find(i => i.id === deleteTargetId);
+            if (target) {
+                target.deleted = true;
+                target.deletedAt = getLocalISOString(0);
+            }
+            saveAllState(true);
+            renderAll();
+            closeDeleteModal();
+            showToast('🗑️ Đã chuyển sự cố vào Thùng rác.');
+        }
+
+        function openTrashModal() {
+            renderTrashModalList();
+            const modal = document.getElementById('trash-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeTrashModal() {
+            const modal = document.getElementById('trash-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function renderTrashModalList() {
+            const container = document.getElementById('trash-list-container');
+            const trashed = incidents.filter(i => i.deleted);
+
+            if (!trashed.length) {
+                container.innerHTML = `<div class="py-10 text-center text-slate-400 text-xs">Thùng rác đang trống.</div>`;
+                return;
+            }
+
+            container.innerHTML = trashed.map(item => `
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div class="space-y-0.5">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-bold text-slate-800">${escapeHTML(item.department)}${item.room ? ' • ' + escapeHTML(item.room) : ''}</span>
+                            <span class="text-[11px] text-slate-400">${formatDisplayDateTime(item.reportedTime)}</span>
+                        </div>
+                        <p class="text-xs text-slate-600">[${escapeHTML(item.category)}] ${escapeHTML(item.description)}</p>
+                    </div>
+                    <div class="flex items-center space-x-1.5 shrink-0">
+                        <button type="button" onclick="restoreIncidentFromTrash('${item.id}')"
+                            class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold cursor-pointer">Khôi phục</button>
+                        <button type="button" onclick="permanentlyDeleteSingle('${item.id}')"
+                            class="px-2.5 py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 text-xs font-semibold cursor-pointer">🔒 Xóa hẳn</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function restoreIncidentFromTrash(id) {
+            const item = incidents.find(i => i.id === id);
+            if (!item) return;
+            item.deleted = false;
+            saveAllState(true);
+            renderTrashModalList();
+            renderAll();
+            showToast('✓ Đã khôi phục sự cố!');
+        }
+
+        function permanentlyDeleteSingle(id) {
+            requireAdminPin(`Nhập PIN Admin để xóa vĩnh viễn sự cố #${id}:`, () => {
+                incidents = incidents.filter(i => i.id !== id);
+                saveAllState(true, true);
+                renderTrashModalList();
+                renderAll();
+                showToast('✓ Đã xóa vĩnh viễn.');
+            });
+        }
+
+        function emptyTrashWithPin() {
+            const trashedCount = incidents.filter(i => i.deleted).length;
+            if (!trashedCount) return;
+            requireAdminPin(`Nhập PIN Admin để dọn sạch ${trashedCount} sự cố trong thùng rác:`, () => {
+                incidents = incidents.filter(i => !i.deleted);
+                saveAllState(true, true);
+                renderTrashModalList();
+                renderAll();
+                showToast('✓ Đã dọn sạch thùng rác.');
+            });
+        }
+
+        /* =========================================================================
+         * PHẦN 10: BỘ LỌC NGÀY/THÁNG/NĂM, SẮP XẾP (SORT) & RENDER BẢNG SỰ CỐ
+         * ========================================================================= */
+        function setQuickDateFilter(mode) {
+            activeQuickDateMode = mode;
+            const fromEl = document.getElementById('filterDateFrom');
+            const toEl = document.getElementById('filterDateTo');
+            const now = new Date();
+            const pad = n => String(n).padStart(2, '0');
+            const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+
+            if (mode === 'TODAY') {
+                fromEl.value = todayStr;
+                toEl.value = todayStr;
+            } else if (mode === 'MONTH') {
+                const firstDayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+                fromEl.value = firstDayStr;
+                toEl.value = todayStr;
+            } else {
+                fromEl.value = '';
+                toEl.value = '';
+            }
+            updateDateFilterButtonsUI();
+            renderAll();
+        }
+
+        function onCustomDateRangeChange() {
+            const fromVal = document.getElementById('filterDateFrom').value;
+            const toVal = document.getElementById('filterDateTo').value;
+            activeQuickDateMode = (fromVal || toVal) ? 'CUSTOM' : 'ALL';
+            updateDateFilterButtonsUI();
+            renderAll();
+        }
+
+        function updateDateFilterButtonsUI() {
+            const btnAll = document.getElementById('btn-date-all');
+            const btnToday = document.getElementById('btn-date-today');
+            const btnMonth = document.getElementById('btn-date-month');
+            const activeCls = 'px-2 py-1 rounded-lg text-[11px] font-bold bg-blue-600 text-white cursor-pointer transition';
+            const normalCls = 'px-2 py-1 rounded-lg text-[11px] font-semibold bg-white text-slate-600 border border-slate-300 hover:bg-slate-100 cursor-pointer transition';
+
+            if (btnAll) btnAll.className = (activeQuickDateMode === 'ALL') ? activeCls : normalCls;
+            if (btnToday) btnToday.className = (activeQuickDateMode === 'TODAY') ? activeCls : normalCls;
+            if (btnMonth) btnMonth.className = (activeQuickDateMode === 'MONTH') ? activeCls : normalCls;
+        }
+
+        function toggleDateSortFromHeader() {
+            const sortSelect = document.getElementById('sortOrderSelect');
+            if (!sortSelect) return;
+            sortSelect.value = (sortSelect.value === 'DATE_DESC') ? 'DATE_ASC' : 'DATE_DESC';
+            renderAll();
+        }
+
+        function clearAllFilters() {
+            document.getElementById('filterSearch').value = '';
+            document.getElementById('filterDepartment').value = 'ALL';
+            document.getElementById('filterRoom').value = 'ALL';
+            document.getElementById('filterCategory').value = 'ALL';
+            document.getElementById('filterStatus').value = 'ALL';
+            document.getElementById('filterDateFrom').value = '';
+            document.getElementById('filterDateTo').value = '';
+            document.getElementById('sortOrderSelect').value = 'DATE_DESC';
+            activeQuickDateMode = 'ALL';
+            showUnresolvedOnly = false;
+            updateDateFilterButtonsUI();
+            updateQuickUnresolvedButton();
+            renderAll();
+        }
+
+        function toggleUnresolvedOnly() {
+            showUnresolvedOnly = !showUnresolvedOnly;
+            updateQuickUnresolvedButton();
+            renderAll();
+        }
+
+        function updateQuickUnresolvedButton() {
+            const btn = document.getElementById('btn-quick-unresolved');
+            if (!btn) return;
+            btn.className = showUnresolvedOnly
+                ? 'inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-500 text-white shadow-sm transition cursor-pointer'
+                : 'inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white text-slate-600 border border-slate-300 hover:border-amber-400 transition cursor-pointer';
+        }
+
+        function getPriorityBadgeHTML(priority) {
+            if (priority === 'Khẩn cấp') return `<span class="px-1.5 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">Khẩn cấp</span>`;
+            if (priority === 'Cao') return `<span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 text-[10px] font-bold">Ưu tiên cao</span>`;
+            return '';
+        }
+
+        function getStatusBadgeHTML(status) {
+            if (status === 'Đã khắc phục') {
+                return `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Đã xong</span>`;
+            }
+            if (status && status.toLowerCase().includes('chờ')) {
+                return `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-50 text-red-700 border border-red-200">${escapeHTML(status)}</span>`;
+            }
+            return `<span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">${escapeHTML(status)}</span>`;
+        }
+
+        function renderAll() {
+            const activeIncidents = incidents.filter(i => !i.deleted);
+            const trashedCount = incidents.filter(i => i.deleted).length;
+
+            const trashBadge = document.getElementById('trash-count-badge');
+            const trashDot = document.getElementById('trash-dot-indicator');
+            if (trashBadge) trashBadge.textContent = trashedCount;
+            if (trashDot) trashDot.classList.toggle('hidden', trashedCount === 0);
+
+            // 1. Tính toán các chỉ số KPI
+            const total = activeIncidents.length;
+            const resolvedList = activeIncidents.filter(i => i.status === 'Đã khắc phục');
+            const pendingCount = total - resolvedList.length;
+
+            let totalMinutes = 0, validCount = 0;
+            resolvedList.forEach(i => {
+                const mins = calcDurationMinutes(i.reportedTime, i.resolvedTime);
+                if (mins !== null) { totalMinutes += mins; validCount++; }
+            });
+            const avgMttr = validCount > 0 ? Math.round(totalMinutes / validCount) : 0;
+
+            document.getElementById('kpi-total').textContent = total;
+            document.getElementById('kpi-pending').textContent = pendingCount;
+            document.getElementById('kpi-resolved').textContent = resolvedList.length;
+            document.getElementById('kpi-mttr').textContent = `${avgMttr} phút`;
+            document.getElementById('badge-total-tab').textContent = total;
+            const mnavBadge = document.getElementById('mnav-badge-count');
+            if (mnavBadge) mnavBadge.textContent = total;
+
+            // Cập nhật luôn Tab Thống Kê nếu đang mở
+            if (!document.getElementById('view-stats').classList.contains('hidden')) {
+                renderStatsTab();
+            }
+
+            // 2. Lấy điều kiện lọc
+            const q = (document.getElementById('filterSearch').value || '').toLowerCase().trim();
+            const fDept = document.getElementById('filterDepartment').value;
+            const fRoom = document.getElementById('filterRoom').value;
+            const fCat = document.getElementById('filterCategory').value;
+            const fSt = document.getElementById('filterStatus').value;
+            const dateFromStr = document.getElementById('filterDateFrom').value;
+            const dateToStr = document.getElementById('filterDateTo').value;
+            const sortOrder = document.getElementById('sortOrderSelect') ? document.getElementById('sortOrderSelect').value : 'DATE_DESC';
+
+            const thSortIcon = document.getElementById('th-sort-icon');
+            if (thSortIcon) {
+                if (sortOrder === 'DATE_ASC') thSortIcon.className = 'fa-solid fa-sort-up ml-1 text-blue-600';
+                else if (sortOrder === 'DATE_DESC') thSortIcon.className = 'fa-solid fa-sort-down ml-1 text-blue-600';
+                else thSortIcon.className = 'fa-solid fa-sort ml-1 text-slate-400';
+            }
+
+            const filtered = activeIncidents.filter(item => {
+                if (showUnresolvedOnly && item.status === 'Đã khắc phục') return false;
+                if (fDept !== 'ALL' && item.department !== fDept) return false;
+                if (fRoom !== 'ALL') {
+                    if (fRoom === 'NONE' && item.room) return false;
+                    if (fRoom !== 'NONE' && item.room !== fRoom) return false;
+                }
+                if (fCat !== 'ALL' && item.category !== fCat) return false;
+                if (fSt !== 'ALL' && item.status !== fSt) return false;
+
+                if (dateFromStr || dateToStr) {
+                    const itemDatePart = (item.reportedTime || '').slice(0, 10);
+                    if (!itemDatePart) return false;
+                    if (dateFromStr && itemDatePart < dateFromStr) return false;
+                    if (dateToStr && itemDatePart > dateToStr) return false;
+                }
+
+                if (q) {
+                    const hay = `${item.id} ${item.department || ''} ${item.room || ''} ${item.category} ${item.reporter} ${item.description} ${item.resolutionNotes || ''}`.toLowerCase();
+                    if (!hay.includes(q)) return false;
+                }
+                return true;
+            });
+
+            // 3. Sắp xếp danh sách
+            const priorityWeight = { 'Khẩn cấp': 3, 'Cao': 2, 'Bình thường': 1 };
+            filtered.sort((a, b) => {
+                const timeA = new Date(a.reportedTime || 0).getTime() || 0;
+                const timeB = new Date(b.reportedTime || 0).getTime() || 0;
+
+                if (sortOrder === 'DATE_ASC') return timeA - timeB;
+                if (sortOrder === 'PRIORITY_DESC') {
+                    const unresA = a.status !== 'Đã khắc phục' ? 1 : 0;
+                    const unresB = b.status !== 'Đã khắc phục' ? 1 : 0;
+                    if (unresA !== unresB) return unresB - unresA;
+                    const pA = priorityWeight[a.priority] || 1;
+                    const pB = priorityWeight[b.priority] || 1;
+                    if (pA !== pB) return pB - pA;
+                    return timeB - timeA;
+                }
+                if (sortOrder === 'MTTR_DESC') {
+                    const mA = (a.status === 'Đã khắc phục' ? calcDurationMinutes(a.reportedTime, a.resolvedTime) : -1) ?? -1;
+                    const mB = (b.status === 'Đã khắc phục' ? calcDurationMinutes(b.reportedTime, b.resolvedTime) : -1) ?? -1;
+                    if (mA !== mB) return mB - mA;
+                    return timeB - timeA;
+                }
+                return timeB - timeA;
+            });
+
+            document.getElementById('filtered-count-badge').textContent = filtered.length;
+
+            const tbody = document.getElementById('incident-table-body');
+            const mobileCards = document.getElementById('incident-mobile-cards');
+            const emptyState = document.getElementById('empty-state');
+
+            if (!filtered.length) {
+                tbody.innerHTML = '';
+                if (mobileCards) mobileCards.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            // 4. Render Thẻ Mobile
+            if (mobileCards) {
+                mobileCards.innerHTML = filtered.map(item => {
+                    const isResolved = item.status === 'Đã khắc phục';
+                    const mttrMins = isResolved ? calcDurationMinutes(item.reportedTime, item.resolvedTime) : null;
+                    const photos = Array.isArray(item.photos) ? item.photos : [];
+
+                    return `
+                        <div class="p-3.5 space-y-2 ${!isResolved ? 'bg-amber-50/20' : 'bg-white'}">
+                            <div class="flex items-start justify-between gap-2">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-1">
+                                        ${getPriorityBadgeHTML(item.priority)}
+                                        <span class="font-bold text-xs text-slate-900">${escapeHTML(item.department)}</span>
+                                        ${item.room ? `<span class="text-xs text-slate-500">• ${escapeHTML(item.room)}</span>` : ''}
+                                    </div>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">${formatDisplayDateTime(item.reportedTime)} • Báo bởi: ${escapeHTML(item.reporter)}</p>
+                                </div>
+                                ${getStatusBadgeHTML(item.status)}
+                            </div>
+
+                            <div>
+                                <span class="text-xs font-bold text-blue-600">[${escapeHTML(item.category)}]</span>
+                                <span class="text-xs text-slate-700 ml-1">${escapeHTML(item.description)}</span>
+                            </div>
+
+                            ${photos.length > 0 ? `
+                                <div class="flex items-center space-x-1.5">
+                                    ${photos.slice(0, 4).map((src, idx) => `
+                                        <img src="${src}" onclick="openLightboxForIncident('${item.id}', ${idx})" class="w-10 h-10 rounded-lg object-cover border border-slate-200">
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+
+                            <div class="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] text-slate-500">
+                                <div>
+                                    ${(isResolved && mttrMins !== null) ? `<span class="font-bold text-emerald-700">⏱ Xong sau ${mttrMins}p</span>` : ''}
+                                </div>
+                                <div class="flex items-center space-x-1.5">
+                                    ${!isResolved ? `
+                                        <button type="button" onclick="markResolvedQuick('${item.id}')" class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-xs font-bold">✓ Xong</button>
+                                    ` : ''}
+                                    <button type="button" onclick="editIncident('${item.id}')" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold">Sửa</button>
+                                    <button type="button" onclick="openDeleteModal('${item.id}')" class="px-2 py-1 rounded-lg bg-slate-100 text-slate-500 text-xs"><i class="fa-solid fa-trash-can"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // 5. Render Bảng Máy tính (PC)
+            tbody.innerHTML = filtered.map(item => {
+                const isResolved = item.status === 'Đã khắc phục';
+                const mttrMins = isResolved ? calcDurationMinutes(item.reportedTime, item.resolvedTime) : null;
+                const photos = Array.isArray(item.photos) ? item.photos : [];
+
+                return `
+                    <tr class="hover:bg-slate-50/90 transition ${!isResolved ? 'bg-amber-50/15' : ''}">
+                        <td class="py-3 px-3.5 align-top">
+                            <div class="flex items-center gap-1.5">
+                                ${getPriorityBadgeHTML(item.priority)}
+                                <span class="font-bold text-slate-900 text-xs sm:text-sm">${escapeHTML(item.department)}</span>
+                            </div>
+                            ${item.room ? `<div class="text-xs font-medium text-slate-600 mt-0.5">🚪 ${escapeHTML(item.room)}</div>` : ''}
+                            <div class="text-[11px] text-slate-400 mt-1">
+                                <i class="fa-regular fa-clock mr-1"></i>${formatDisplayDateTime(item.reportedTime)} • ${escapeHTML(item.reporter)}
+                            </div>
+                        </td>
+
+                        <td class="py-3 px-3.5 align-top max-w-xs">
+                            <div class="text-xs font-bold text-blue-600 mb-0.5">${escapeHTML(item.category)}</div>
+                            <p class="text-slate-700 text-xs leading-relaxed break-words">${escapeHTML(item.description)}</p>
+                            ${photos.length > 0 ? `
+                                <div class="mt-1.5 flex items-center space-x-1">
+                                    ${photos.slice(0, 3).map((src, idx) => `
+                                        <img src="${src}" onclick="openLightboxForIncident('${item.id}', ${idx})" class="w-8 h-8 rounded object-cover border border-slate-300 cursor-pointer hover:opacity-80">
+                                    `).join('')}
+                                    <span onclick="openLightboxForIncident('${item.id}', 0)" class="text-[11px] text-blue-600 font-semibold pl-1 cursor-pointer hover:underline">${photos.length} ảnh</span>
+                                </div>
+                            ` : ''}
+                        </td>
+
+                        <td class="py-3 px-3.5 align-top text-xs space-y-1">
+                            <div class="text-slate-600">
+                                <span class="text-slate-400">Tiếp nhận:</span> <span class="font-medium text-slate-800">${formatDisplayDateTime(item.receivedTime || item.reportedTime)}</span>
+                            </div>
+                            ${(isResolved && item.resolvedTime) ? `
+                                <div class="text-emerald-700 font-medium">
+                                    <span>Xong: ${formatDisplayDateTime(item.resolvedTime)}</span>
+                                    ${mttrMins !== null ? `<span class="ml-1 px-1.5 py-0.2 rounded bg-emerald-50 border border-emerald-200 text-[11px] font-bold">${mttrMins}p</span>` : ''}
+                                </div>
+                            ` : ''}
+                            ${item.resolutionNotes ? `<div class="text-[11px] text-slate-500 italic">Note: ${escapeHTML(item.resolutionNotes)}</div>` : ''}
+                        </td>
+
+                        <td class="py-3 px-3.5 align-top whitespace-nowrap">
+                            <div class="flex flex-col items-start gap-1.5">
+                                ${getStatusBadgeHTML(item.status)}
+                                ${!isResolved ? `
+                                    <button type="button" onclick="markResolvedQuick('${item.id}')"
+                                        class="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold cursor-pointer">
+                                        ✓ Đánh dấu xong
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </td>
+
+                        <td class="py-3 px-3.5 align-top text-right whitespace-nowrap">
+                            <button type="button" onclick="editIncident('${item.id}')" class="p-1.5 rounded-lg text-slate-500 hover:text-blue-600 hover:bg-blue-50" title="Sửa"><i class="fa-solid fa-pen"></i></button>
+                            <button type="button" onclick="openDeleteModal('${item.id}')" class="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50" title="Chuyển vào Thùng rác"><i class="fa-solid fa-trash-can"></i></button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        /* =========================================================================
+         * PHẦN 11: MODULE THỐNG KÊ SỐ LIỆU THEO TUẦN / THÁNG / NĂM (STATISTICS TAB)
+         * ========================================================================= */
+        // Lấy ngày Thứ Hai đầu tuần của một ngày bất kỳ
+        function getMondayOfWeek(d) {
+            const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            const day = date.getDay(); // 0 (CN) -> 6 (T7)
+            const diff = (day === 0 ? -6 : 1 - day);
+            date.setDate(date.getDate() + diff);
+            date.setHours(0, 0, 0, 0);
+            return date;
+        }
+
+        // Chuyển đổi chế độ xem thống kê: WEEK | MONTH | YEAR | ALL
+        function setStatsGranularity(mode) {
+            statsGranularity = mode;
+            const modes = ['WEEK', 'MONTH', 'YEAR', 'ALL'];
+            const ids = {
+                WEEK: 'stats-mode-week',
+                MONTH: 'stats-mode-month',
+                YEAR: 'stats-mode-year',
+                ALL: 'stats-mode-all'
+            };
+            const activeCls = 'px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-600 shadow-sm transition cursor-pointer';
+            const normalCls = 'px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer';
+
+            modes.forEach(m => {
+                const btn = document.getElementById(ids[m]);
+                if (btn) btn.className = (m === mode) ? activeCls : normalCls;
+            });
+
+            const navControls = document.getElementById('stats-nav-controls');
+            if (navControls) {
+                navControls.classList.toggle('hidden', mode === 'ALL');
+            }
+
+            renderStatsTab();
+        }
+
+        // Lùi hoặc tiến 1 Tuần / 1 Tháng / 1 Năm
+        function stepStatsPeriod(dir) {
+            const d = new Date(statsAnchorDate);
+            if (statsGranularity === 'WEEK') {
+                d.setDate(d.getDate() + dir * 7);
+            } else if (statsGranularity === 'MONTH') {
+                d.setMonth(d.getMonth() + dir);
+            } else if (statsGranularity === 'YEAR') {
+                d.setFullYear(d.getFullYear() + dir);
+            }
+            statsAnchorDate = d;
+            renderStatsTab();
+        }
+
+        function resetStatsPeriodToNow() {
+            statsAnchorDate = new Date();
+            renderStatsTab();
+        }
+
+        // Tính khoảng thời gian bắt đầu & kết thúc và các cột biểu đồ theo kỳ đang chọn
+        function getStatsPeriodRangeAndBuckets() {
+            const pad = n => String(n).padStart(2, '0');
+            const anchor = new Date(statsAnchorDate);
+            let startTime = null;
+            let endTime = null;
+            let periodLabel = 'Tất cả thời gian';
+            let trendTitle = 'Biểu Đồ Xu Hướng Sự Cố';
+            let buckets = [];
+
+            if (statsGranularity === 'WEEK') {
+                const mon = getMondayOfWeek(anchor);
+                const sun = new Date(mon);
+                sun.setDate(mon.getDate() + 6);
+                sun.setHours(23, 59, 59, 999);
+
+                startTime = mon.getTime();
+                endTime = sun.getTime();
+                periodLabel = `${pad(mon.getDate())}/${pad(mon.getMonth() + 1)} – ${pad(sun.getDate())}/${pad(sun.getMonth() + 1)}/${sun.getFullYear()}`;
+                trendTitle = `Xu Hướng Sự Cố Trong Tuần (${periodLabel})`;
+
+                const dayNames = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+                for (let i = 0; i < 7; i++) {
+                    const cur = new Date(mon);
+                    cur.setDate(mon.getDate() + i);
+                    const ymd = `${cur.getFullYear()}-${pad(cur.getMonth() + 1)}-${pad(cur.getDate())}`;
+                    buckets.push({
+                        key: ymd,
+                        label: `${dayNames[i]} (${pad(cur.getDate())}/${pad(cur.getMonth() + 1)})`,
+                        shortLabel: dayNames[i],
+                        subLabel: `${pad(cur.getDate())}/${pad(cur.getMonth() + 1)}`,
+                        total: 0,
+                        resolved: 0
+                    });
+                }
+            } else if (statsGranularity === 'MONTH') {
+                const y = anchor.getFullYear();
+                const m = anchor.getMonth();
+                const firstDay = new Date(y, m, 1, 0, 0, 0, 0);
+                const lastDay = new Date(y, m + 1, 0, 23, 59, 59, 999);
+
+                startTime = firstDay.getTime();
+                endTime = lastDay.getTime();
+                periodLabel = `Tháng ${pad(m + 1)}/${y}`;
+                trendTitle = `Xu Hướng Sự Cố Theo Ngày Trong ${periodLabel}`;
+
+                const daysInMonth = lastDay.getDate();
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const ymd = `${y}-${pad(m + 1)}-${pad(d)}`;
+                    buckets.push({
+                        key: ymd,
+                        label: `Ngày ${pad(d)}/${pad(m + 1)}`,
+                        shortLabel: `${d}`,
+                        subLabel: '',
+                        total: 0,
+                        resolved: 0
+                    });
+                }
+            } else if (statsGranularity === 'YEAR') {
+                const y = anchor.getFullYear();
+                const firstDay = new Date(y, 0, 1, 0, 0, 0, 0);
+                const lastDay = new Date(y, 11, 31, 23, 59, 59, 999);
+
+                startTime = firstDay.getTime();
+                endTime = lastDay.getTime();
+                periodLabel = `Năm ${y}`;
+                trendTitle = `Xu Hướng Sự Cố 12 Tháng Trong Năm ${y}`;
+
+                for (let m = 0; m < 12; m++) {
+                    const ym = `${y}-${pad(m + 1)}`;
+                    buckets.push({
+                        key: ym,
+                        label: `Tháng ${m + 1}/${y}`,
+                        shortLabel: `T${m + 1}`,
+                        subLabel: '',
+                        total: 0,
+                        resolved: 0
+                    });
+                }
+            } else {
+                // Chế độ ALL: Gom theo các tháng xuất hiện hoặc 6 tháng gần nhất
+                periodLabel = 'Tất cả thời gian';
+                trendTitle = 'Xu Hướng Sự Cố Theo Tháng (Toàn bộ dữ liệu)';
+                const now = new Date();
+                for (let i = 11; i >= 0; i--) {
+                    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    const ym = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+                    buckets.push({
+                        key: ym,
+                        label: `Tháng ${pad(d.getMonth() + 1)}/${d.getFullYear()}`,
+                        shortLabel: `${pad(d.getMonth() + 1)}/${String(d.getFullYear()).slice(-2)}`,
+                        subLabel: '',
+                        total: 0,
+                        resolved: 0
+                    });
+                }
+            }
+
+            return { startTime, endTime, periodLabel, trendTitle, buckets };
+        }
+
+        // Lấy danh sách sự cố thuộc kỳ thống kê đang chọn
+        function getFilteredIncidentsForStats() {
+            const active = incidents.filter(i => !i.deleted);
+            const info = getStatsPeriodRangeAndBuckets();
+            const list = active.filter(item => {
+                if (!item.reportedTime) return false;
+                const t = new Date(item.reportedTime).getTime();
+                if (isNaN(t)) return false;
+                if (info.startTime !== null && t < info.startTime) return false;
+                if (info.endTime !== null && t > info.endTime) return false;
+                return true;
+            });
+            return { list, ...info };
+        }
+
+        // Vẽ danh sách xếp hạng kèm thanh tỷ lệ %
+        function renderBreakdownListHTML(countsMap, totalCount, barColorClass) {
+            const entries = Object.entries(countsMap).sort((a, b) => b[1] - a[1]);
+            if (!entries.length || totalCount === 0) {
+                return `<div class="py-8 text-center text-xs text-slate-400">Chưa có dữ liệu trong kỳ này.</div>`;
+            }
+            return entries.map(([name, count]) => {
+                const pct = Math.round((count / totalCount) * 100);
+                return `
+                    <div class="py-2.5 space-y-1">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-semibold text-slate-800 truncate pr-2">${escapeHTML(name)}</span>
+                            <span class="font-bold text-slate-700 shrink-0">${count} ca <span class="text-slate-400 font-normal">(${pct}%)</span></span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div class="h-full ${barColorClass} rounded-full transition-all duration-300" style="width: ${Math.max(pct, 4)}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Render toàn bộ giao diện Tab Thống Kê
+        function renderStatsTab() {
+            const { list, periodLabel, trendTitle, buckets } = getFilteredIncidentsForStats();
+
+            const lblEl = document.getElementById('stats-current-label');
+            if (lblEl) lblEl.textContent = periodLabel;
+            const titleEl = document.getElementById('stats-trend-title');
+            if (titleEl) titleEl.textContent = trendTitle;
+
+            // 1. Tính 4 KPI của kỳ
+            const total = list.length;
+            const resolvedList = list.filter(i => i.status === 'Đã khắc phục');
+            const pendingCount = total - resolvedList.length;
+            const ratePct = total > 0 ? Math.round((resolvedList.length / total) * 100) : 0;
+
+            const urgentCount = list.filter(i => i.priority === 'Khẩn cấp').length;
+            const highCount = list.filter(i => i.priority === 'Cao').length;
+
+            // Thời gian phản hồi trung bình (Reported -> Received)
+            let respSum = 0, respValid = 0;
+            list.forEach(i => {
+                const m = calcDurationMinutes(i.reportedTime, i.receivedTime || i.reportedTime);
+                if (m !== null) { respSum += m; respValid++; }
+            });
+            const avgResp = respValid > 0 ? Math.round(respSum / respValid) : 0;
+
+            // Thời gian khắc phục trung bình (MTTR), Min, Max
+            let mttrSum = 0, mttrValid = 0, minMttr = null, maxMttr = null;
+            resolvedList.forEach(i => {
+                const m = calcDurationMinutes(i.reportedTime, i.resolvedTime);
+                if (m !== null) {
+                    mttrSum += m;
+                    mttrValid++;
+                    if (minMttr === null || m < minMttr) minMttr = m;
+                    if (maxMttr === null || m > maxMttr) maxMttr = m;
+                }
+            });
+            const avgMttr = mttrValid > 0 ? Math.round(mttrSum / mttrValid) : 0;
+
+            document.getElementById('stat-kpi-total').textContent = total;
+            document.getElementById('stat-kpi-priority-sub').textContent = `${urgentCount} Khẩn cấp • ${highCount} Ưu tiên cao`;
+            document.getElementById('stat-kpi-rate').textContent = `${ratePct}%`;
+            document.getElementById('stat-kpi-resolved-sub').textContent = `${resolvedList.length} đã xong / ${pendingCount} tồn đọng`;
+            document.getElementById('stat-kpi-response').textContent = `${avgResp} phút`;
+            document.getElementById('stat-kpi-mttr').textContent = `${avgMttr} phút`;
+            document.getElementById('stat-kpi-mttr-sub').textContent = mttrValid > 0
+                ? `Nhanh nhất: ${minMttr}p | Lâu nhất: ${maxMttr}p`
+                : 'Chưa có ca hoàn tất trong kỳ';
+
+            // 2. Đổ dữ liệu vào các cột Biểu đồ xu hướng (Trend Chart)
+            const bucketMap = {};
+            buckets.forEach(b => { bucketMap[b.key] = b; });
+
+            list.forEach(item => {
+                const iso = item.reportedTime || '';
+                const key = (statsGranularity === 'WEEK' || statsGranularity === 'MONTH')
+                    ? iso.slice(0, 10)  // YYYY-MM-DD
+                    : iso.slice(0, 7);  // YYYY-MM
+                if (bucketMap[key]) {
+                    bucketMap[key].total++;
+                    if (item.status === 'Đã khắc phục') bucketMap[key].resolved++;
+                }
+            });
+
+            const maxBucketVal = Math.max(...buckets.map(b => b.total), 1);
+            const chartContainer = document.getElementById('stats-trend-chart');
+            if (chartContainer) {
+                chartContainer.innerHTML = `
+                    <div class="flex items-end space-x-1.5 sm:space-x-2.5 min-h-[180px] pt-6 pb-2 px-1" style="min-width: ${buckets.length > 14 ? buckets.length * 32 : 100}px">
+                        ${buckets.map(b => {
+                            const hTotal = Math.round((b.total / maxBucketVal) * 120);
+                            const hRes = Math.round((b.resolved / maxBucketVal) * 120);
+                            return `
+                                <div class="flex-1 flex flex-col items-center group" title="${b.label}: Tổng ${b.total} ca (Đã xong ${b.resolved} ca)">
+                                    <div class="text-[10px] font-bold ${b.total > 0 ? 'text-slate-700' : 'text-transparent'} mb-1">
+                                        ${b.total}
+                                    </div>
+                                    <div class="w-full max-w-[34px] h-[124px] bg-slate-100/80 rounded-t-lg flex items-end justify-center p-0.5 space-x-0.5 border-b border-slate-200">
+                                        <div class="w-1/2 bg-blue-500 rounded-t transition-all duration-300" style="height: ${b.total > 0 ? Math.max(hTotal, 6) : 0}px"></div>
+                                        <div class="w-1/2 bg-emerald-500 rounded-t transition-all duration-300" style="height: ${b.resolved > 0 ? Math.max(hRes, 6) : 0}px"></div>
+                                    </div>
+                                    <div class="text-[10px] font-bold text-slate-600 mt-1.5 whitespace-nowrap">${b.shortLabel}</div>
+                                    ${b.subLabel ? `<div class="text-[9px] text-slate-400 whitespace-nowrap">${b.subLabel}</div>` : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+
+            // 3. Thống kê theo Khoa, Phân loại lỗi, Phòng thực hiện
+            const deptMap = {};
+            const catMap = {};
+            const roomMap = {};
+            const deptDetailMap = {};
+
+            list.forEach(item => {
+                const dept = item.department || 'Chưa phân khoa';
+                const cat = item.category || 'Chưa phân loại';
+                const room = item.room || 'Toàn khoa / Không chọn phòng';
+
+                deptMap[dept] = (deptMap[dept] || 0) + 1;
+                catMap[cat] = (catMap[cat] || 0) + 1;
+                roomMap[room] = (roomMap[room] || 0) + 1;
+
+                if (!deptDetailMap[dept]) {
+                    deptDetailMap[dept] = { total: 0, resolved: 0, pending: 0, urgent: 0, mttrSum: 0, mttrCount: 0 };
+                }
+                deptDetailMap[dept].total++;
+                if (item.priority === 'Khẩn cấp') deptDetailMap[dept].urgent++;
+                if (item.status === 'Đã khắc phục') {
+                    deptDetailMap[dept].resolved++;
+                    const m = calcDurationMinutes(item.reportedTime, item.resolvedTime);
+                    if (m !== null) {
+                        deptDetailMap[dept].mttrSum += m;
+                        deptDetailMap[dept].mttrCount++;
+                    }
+                } else {
+                    deptDetailMap[dept].pending++;
+                }
+            });
+
+            document.getElementById('stats-by-department').innerHTML = renderBreakdownListHTML(deptMap, total, 'bg-blue-600');
+            document.getElementById('stats-by-category').innerHTML = renderBreakdownListHTML(catMap, total, 'bg-purple-600');
+            document.getElementById('stats-by-room').innerHTML = renderBreakdownListHTML(roomMap, total, 'bg-amber-500');
+
+            // 4. Bảng chi tiết theo từng Khoa
+            const detailBody = document.getElementById('stats-detail-table-body');
+            const deptEntries = Object.entries(deptDetailMap).sort((a, b) => b[1].total - a[1].total);
+            if (!deptEntries.length) {
+                detailBody.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-xs text-slate-400">Không có sự cố nào phát sinh trong kỳ thống kê này.</td></tr>`;
+            } else {
+                detailBody.innerHTML = deptEntries.map(([deptName, st]) => {
+                    const avg = st.mttrCount > 0 ? `${Math.round(st.mttrSum / st.mttrCount)} phút` : '—';
+                    return `
+                        <tr class="hover:bg-slate-50">
+                            <td class="py-3 px-4 font-bold text-slate-800">${escapeHTML(deptName)}</td>
+                            <td class="py-3 px-4 text-center font-bold text-slate-900">${st.total}</td>
+                            <td class="py-3 px-4 text-center font-semibold text-emerald-600">${st.resolved}</td>
+                            <td class="py-3 px-4 text-center font-semibold ${st.pending > 0 ? 'text-amber-600' : 'text-slate-400'}">${st.pending}</td>
+                            <td class="py-3 px-4 text-center font-semibold ${st.urgent > 0 ? 'text-red-600' : 'text-slate-400'}">${st.urgent}</td>
+                            <td class="py-3 px-4 text-right font-bold text-purple-700">${avg}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // Xuất bảng báo cáo thống kê của kỳ đang chọn ra file Excel (.csv)
+        function exportStatsSummaryCSV() {
+            const { list, periodLabel } = getFilteredIncidentsForStats();
+            const headers = ['Kỳ thống kê', 'Mã sự cố', 'Ưu tiên', 'Giờ xảy ra', 'Giờ tiếp nhận', 'Khoa', 'Phòng thực hiện', 'Loại lỗi', 'Người báo', 'Mô tả', 'Tình trạng', 'Giờ xong', 'MTTR (phút)'];
+            const csvRows = [headers.join(',')];
+
+            list.forEach(item => {
+                const isResolved = item.status === 'Đã khắc phục';
+                const mttrMins = isResolved ? calcDurationMinutes(item.reportedTime, item.resolvedTime) : '';
+                const row = [
+                    periodLabel, item.id, item.priority || 'Bình thường',
+                    formatDisplayDateTime(item.reportedTime),
+                    formatDisplayDateTime(item.receivedTime || item.reportedTime),
+                    item.department || '', item.room || '',
+                    item.category, item.reporter, item.description, item.status,
+                    isResolved ? formatDisplayDateTime(item.resolvedTime) : '', mttrMins ?? ''
+                ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`);
+                csvRows.push(row.join(','));
+            });
+
+            const blob = new Blob(['\uFEFF' + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Thong_Ke_PACS_${periodLabel.replace(/[^a-zA-Z0-9_-]/g, '_')}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast(`✓ Đã xuất thống kê kỳ "${periodLabel}"!`);
+        }
+
+        /* =========================================================================
+         * PHẦN 12: TRÌNH XEM ẢNH PHÓNG TO (LIGHTBOX GALLERY)
+         * ========================================================================= */
+        function openLightboxForIncident(id, index) {
+            const item = incidents.find(i => i.id === id);
+            if (!item || !item.photos || !item.photos.length) return;
+            lightboxState = { photos: item.photos, index: index || 0, title: `${item.department} - ${item.category}` };
+            updateLightboxModal();
+        }
+
+        function openLightboxForForm(index) {
+            if (!formPhotos.length) return;
+            lightboxState = { photos: formPhotos, index: index || 0, title: 'Ảnh đính kèm' };
+            updateLightboxModal();
+        }
+
+        function updateLightboxModal() {
+            const modal = document.getElementById('lightbox-modal');
+            const src = lightboxState.photos[lightboxState.index];
+            document.getElementById('lightbox-img').src = src;
+            document.getElementById('lightbox-download').href = src;
+            document.getElementById('lightbox-caption').textContent = `${lightboxState.title} (${lightboxState.index + 1}/${lightboxState.photos.length})`;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function stepLightbox(dir) {
+            const len = lightboxState.photos.length;
+            if (len <= 1) return;
+            lightboxState.index = (lightboxState.index + dir + len) % len;
+            updateLightboxModal();
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox-modal').classList.add('hidden');
+            document.getElementById('lightbox-modal').classList.remove('flex');
+        }
+
+        /* =========================================================================
+         * PHẦN 13: SAO LƯU FILE (.JSON), BÁO CÁO SỐ LIỆU TRONG NGÀY & XUẤT EXCEL
+         * ========================================================================= */
+        function exportBackupJSON() {
+            const bundle = { incidents, configData, exportedAt: new Date().toISOString() };
+            const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Sao_Luu_PACS_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('✓ Đã tải file sao lưu (.json)!');
+        }
+
+        function importBackupJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    let rawInc = Array.isArray(parsed) ? parsed : (parsed.incidents || []);
+                    let rawCfg = parsed.configData || null;
+                    const { newIncidents, newConfig } = normalizeAndMigrateData(rawInc, rawCfg);
+                    incidents = newIncidents;
+                    configData = newConfig;
+                    syncMissingValuesIntoConfig();
+                    await saveAllState(true, true);
+                    renderDropdownsInFormAndFilter();
+                    renderConfigTabLists();
+                    renderAll();
+                    showToast(`✓ Đã nạp ${incidents.length} sự cố!`);
+                } catch (err) {
+                    showToast('File JSON không hợp lệ!');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function copyShiftHandoverReport() {
+            const todayYMD = getTodayDateString();
+            const todayDisplay = new Date().toLocaleDateString('vi-VN');
+            const active = incidents.filter(i => !i.deleted);
+
+            const todayIncidents = active.filter(i => (i.reportedTime || '').slice(0, 10) === todayYMD);
+            const todayResolved = todayIncidents.filter(i => i.status === 'Đã khắc phục');
+            const todayPending = todayIncidents.filter(i => i.status !== 'Đã khắc phục');
+
+            let todayTotalMins = 0, todayValidMttr = 0;
+            todayResolved.forEach(i => {
+                const m = calcDurationMinutes(i.reportedTime, i.resolvedTime);
+                if (m !== null) { todayTotalMins += m; todayValidMttr++; }
+            });
+            const todayAvgMttr = todayValidMttr > 0 ? Math.round(todayTotalMins / todayValidMttr) : 0;
+
+            const olderPending = active.filter(i => (i.reportedTime || '').slice(0, 10) !== todayYMD && i.status !== 'Đã khắc phục');
+
+            const lines = [
+                `📋 BÁO CÁO SỐ LIỆU VỀ PACS TRONG NGÀY (${todayDisplay})`,
+                `📊 Số liệu hôm nay: Tổng ${todayIncidents.length} ca | ✅ Đã xong: ${todayResolved.length} | ⏳ Chưa xong: ${todayPending.length} | ⏱ MTTR: ${todayAvgMttr} phút`,
+                `--------------------------------`
+            ];
+
+            if (todayIncidents.length === 0) {
+                lines.push(`✨ Trong ngày hôm nay chưa phát sinh sự cố PACS nào.`);
+            } else {
+                if (todayPending.length > 0) {
+                    lines.push(`🔥 ĐANG TỒN ĐỌNG TRONG NGÀY (${todayPending.length} ca):`);
+                    todayPending.forEach((inc, idx) => {
+                        const place = inc.room ? `${inc.department} (${inc.room})` : inc.department;
+                        lines.push(`  ${idx + 1}. [${inc.status}] ${place} - ${inc.category}: ${inc.description}`);
+                    });
+                }
+                if (todayResolved.length > 0) {
+                    lines.push(`✅ ĐÃ XỬ LÝ XONG TRONG NGÀY (${todayResolved.length} ca):`);
+                    todayResolved.forEach((inc, idx) => {
+                        const place = inc.room ? `${inc.department} (${inc.room})` : inc.department;
+                        const m = calcDurationMinutes(inc.reportedTime, inc.resolvedTime);
+                        lines.push(`  ${idx + 1}. ${place} - ${inc.category}: ${inc.description}${m !== null ? ` (${m}p)` : ''}`);
+                    });
+                }
+            }
+
+            if (olderPending.length > 0) {
+                lines.push(`--------------------------------`);
+                lines.push(`⚠️ Tồn đọng từ ngày trước chuyển sang: ${olderPending.length} ca.`);
+            }
+
+            const ta = document.createElement('textarea');
+            ta.value = lines.join('\n');
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast(`📋 Đã copy số liệu ngày ${todayDisplay}! Hãy dán (Ctrl+V) vào Zalo.`);
+        }
+
+        function exportExcelCSV() {
+            const active = incidents.filter(i => !i.deleted);
+            const headers = ['Mã', 'Ưu tiên', 'Giờ xảy ra', 'Giờ tiếp nhận', 'Khoa', 'Phòng', 'Loại lỗi', 'Người báo', 'Mô tả', 'Tình trạng', 'Giờ xong', 'MTTR (phút)', 'Ghi chú'];
+            const csvRows = [headers.join(',')];
+            active.forEach(item => {
+                const isResolved = item.status === 'Đã khắc phục';
+                const mttrMins = isResolved ? calcDurationMinutes(item.reportedTime, item.resolvedTime) : '';
+                const row = [
+                    item.id, item.priority || 'Bình thường', formatDisplayDateTime(item.reportedTime),
+                    formatDisplayDateTime(item.receivedTime || item.reportedTime), item.department || '', item.room || '',
+                    item.category, item.reporter, item.description, item.status,
+                    isResolved ? formatDisplayDateTime(item.resolvedTime) : '', mttrMins ?? '', item.resolutionNotes || ''
+                ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`);
+                csvRows.push(row.join(','));
+            });
+
+            const blob = new Blob(['\uFEFF' + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Bao_Cao_PACS_${Date.now()}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('✓ Đã tải file Excel (.csv)!');
+        }
+
+        let toastTimer = null;
+        function showToast(msg) {
+            const box = document.getElementById('toast-box');
+            const text = document.getElementById('toast-message');
+            if (!box || !text) return;
+            text.textContent = msg;
+            box.classList.remove('hidden');
+            box.classList.add('flex');
+            if (toastTimer) clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                box.classList.add('hidden');
+                box.classList.remove('flex');
+            }, 3000);
+        }
+
+        window.addEventListener('DOMContentLoaded', initAppData);
+    </script>
+</body>
+</html>
