@@ -1236,10 +1236,10 @@
 
             try {
                 firebaseDbUrl = localStorage.getItem(FB_URL_KEY) || DEFAULT_FIREBASE_URL || '';
-                firebasePath = localStorage.getItem(FB_PATH_KEY) || DEFAULT_FIREBASE_PATH || 'pacs_main_data';
+                firebasePath = localStorage.getItem(FB_PATH_KEY) || DEFAULT_FIREBASE_PATH || '';
             } catch (e) {
                 firebaseDbUrl = DEFAULT_FIREBASE_URL || '';
-                firebasePath = DEFAULT_FIREBASE_PATH || 'pacs_main_data';
+                firebasePath = DEFAULT_FIREBASE_PATH || '';
             }
 
             renderDropdownsInFormAndFilter();
@@ -1353,7 +1353,7 @@
 
         function getFirebaseEndpoint(suffix = '') {
             const cleanUrl = cleanFirebaseUrl(firebaseDbUrl);
-            const path = (firebasePath || 'pacs_main_data').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+            const path = (firebasePath || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
             return `${cleanUrl}/${path}${suffix}.json`;
         }
 
@@ -1509,7 +1509,7 @@
 
         function openFirebaseModal() {
             document.getElementById('fb-url-input').value = firebaseDbUrl;
-            document.getElementById('fb-path-input').value = firebasePath || 'pacs_main_data';
+            document.getElementById('fb-path-input').value = firebasePath || '';
             const disBtn = document.getElementById('btn-fb-disconnect');
             const statusEl = document.getElementById('fb-status-badge');
 
@@ -1589,7 +1589,7 @@
 
         async function saveAndConnectFirebase() {
             const url = document.getElementById('fb-url-input').value.trim();
-            const path = document.getElementById('fb-path-input').value.trim() || 'pacs_main_data';
+            const path = document.getElementById('fb-path-input').value.trim() || '';
             if (!url) {
                 showToast('Vui lòng nhập Database URL!');
                 return;
