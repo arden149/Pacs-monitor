@@ -57,7 +57,7 @@
                         <h1 class="text-sm sm:text-base font-bold text-slate-900 truncate">PACS Monitor</h1>
                         <div class="flex items-center space-x-1.5">
                             <span id="save-status-dot" class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
-                            <span id="save-status-text" class="text-[11px] font-medium text-slate-500 truncate">Chưa kết nối DB</span>
+                            <span id="save-status-text" class="text-[11px] font-medium text-slate-500 truncate">Chưa nhập Key DB</span>
                         </div>
                     </div>
                 </div>
@@ -104,9 +104,9 @@
                 <!-- Copy Báo cáo Giao Ca (Số liệu trong ngày) -->
                 <button type="button" onclick="copyShiftHandoverReport()"
                     class="inline-flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition cursor-pointer whitespace-nowrap"
-                    title="Copy nhanh báo cáo số liệu sự cố trong ngày hôm nay">
+                    title="Copy nhanh báo cáo số liệu sự cố trong ngày hôm nay vào Zalo">
                     <i class="fa-regular fa-copy"></i>
-                    <span class="hidden sm:inline">Số liệu (Hôm nay)</span>
+                    <span class="hidden sm:inline">Giao ca (Hôm nay)</span>
                 </button>
 
                 <!-- Xuất Excel -->
@@ -131,10 +131,10 @@
                         <button type="button" onclick="openFirebaseModal(); closeToolsDropdown();"
                             class="w-full px-3.5 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between text-slate-700 font-semibold">
                             <span class="flex items-center space-x-2">
-                                <i class="fa-solid fa-fire text-amber-500 w-4"></i>
-                                <span>Cấu hình Firebase DB</span>
+                                <i class="fa-solid fa-key text-amber-500 w-4"></i>
+                                <span>Kết nối & Nhập Key DB</span>
                             </span>
-                            <span id="cloud-sync-label" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Cài đặt</span>
+                            <span id="cloud-sync-label" class="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-bold">Chưa kết nối</span>
                         </button>
 
                         <button type="button" onclick="openTrashModal(); closeToolsDropdown();"
@@ -782,18 +782,18 @@
     </main>
 
     <!-- ========================================================= -->
-    <!-- MODAL CẤU HÌNH GOOGLE FIREBASE & SNAPSHOT RECOVERY        -->
+    <!-- MODAL CẤU HÌNH GOOGLE FIREBASE & BẮT BUỘC NHẬP SECRET KEY -->
     <!-- ========================================================= -->
     <div id="firebase-modal" class="fixed inset-0 z-50 bg-slate-900/60 hidden items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 space-y-4">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-2.5">
                     <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-lg">
-                        <i class="fa-solid fa-fire"></i>
+                        <i class="fa-solid fa-key"></i>
                     </div>
                     <div>
-                        <h3 class="font-bold text-base text-slate-900">Kết Nối Google Firebase</h3>
-                        <p class="text-xs text-slate-500">Đồng bộ dữ liệu thời gian thực & Tự động lưu bản sao dự phòng</p>
+                        <h3 class="font-bold text-base text-slate-900">Xác Thực & Kết Nối Database</h3>
+                        <p class="text-xs text-slate-500">Bắt buộc nhập đúng Mã Kênh Bí Mật (Secret Key) để tải dữ liệu</p>
                     </div>
                 </div>
                 <button type="button" onclick="closeFirebaseModal()" class="text-slate-400 hover:text-slate-600 text-lg cursor-pointer">✕</button>
@@ -807,9 +807,14 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold text-slate-700 mb-1">2. Mã Kênh Bí Mật (Secret Key)</label>
-                    <input type="text" id="fb-path-input" placeholder="VD: pacs_it_secret_8899"
-                        class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-amber-500">
+                    <label class="block text-xs font-bold text-slate-700 mb-1">2. Mã Kênh Bí Mật (Secret Key) <span class="text-red-500">* Bắt buộc</span></label>
+                    <input type="password" id="fb-path-input" placeholder="Nhập Secret Key của Ban IT để mở khóa dữ liệu..."
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();saveAndConnectFirebase();}"
+                        class="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-300 rounded-xl text-xs font-mono outline-none focus:ring-2 focus:ring-amber-500">
+                    <div class="flex items-center justify-between mt-1">
+                        <span class="text-[11px] text-slate-500">Người dùng phải nhập đúng Key mới truy cập được nhánh dữ liệu.</span>
+                        <button type="button" onclick="toggleSecretKeyVisibility()" class="text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer">Hiện/Ẩn Key</button>
+                    </div>
                 </div>
             </div>
 
@@ -829,24 +834,36 @@
             <div class="p-3 rounded-xl bg-slate-900 text-slate-100 font-mono text-[11px] space-y-1">
                 <div class="flex items-center justify-between border-b border-slate-700 pb-1">
                     <span class="text-slate-400">Trạng thái:</span>
-                    <span id="fb-status-badge" class="text-amber-400 font-bold">Chưa kết nối</span>
+                    <span id="fb-status-badge" class="text-amber-400 font-bold">Chưa nhập Key</span>
                 </div>
-                <div class="text-slate-300 max-h-20 overflow-y-auto space-y-0.5" id="fb-console-log">
-                    <p class="text-slate-400">> Sẵn sàng kết nối...</p>
+                <div class="text-slate-300 max-h-24 overflow-y-auto space-y-0.5" id="fb-console-log">
+                    <p class="text-slate-400">> Vui lòng nhập URL và Secret Key để kết nối...</p>
                 </div>
+            </div>
+
+            <!-- Khung cảnh báo khi Secret Key không tồn tại (Chỉ Admin mới được khởi tạo kênh mới) -->
+            <div id="fb-init-channel-box" class="hidden p-3 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between gap-2">
+                <div class="text-xs text-red-900">
+                    <p class="font-bold">✕ Không tìm thấy dữ liệu ở Secret Key này!</p>
+                    <p class="text-[11px] text-red-700">Nếu bạn nhập nhầm, hãy sửa lại Key ở trên. Nếu bạn là Admin muốn tạo kênh mới tinh, bấm nút bên cạnh:</p>
+                </div>
+                <button type="button" onclick="adminInitializeNewChannel()"
+                    class="px-3 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white shrink-0 cursor-pointer">
+                    🔒 Khởi tạo kênh (PIN)
+                </button>
             </div>
 
             <div class="flex items-center justify-between pt-1">
                 <button type="button" onclick="disconnectFirebase()" id="btn-fb-disconnect"
                     class="hidden text-xs font-bold text-red-600 hover:underline cursor-pointer">
-                    Ngắt kết nối
+                    Ngắt kết nối & Xóa Key
                 </button>
                 <div class="flex items-center space-x-2 ml-auto">
                     <button type="button" onclick="closeFirebaseModal()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 text-slate-700 cursor-pointer">
                         Đóng
                     </button>
                     <button type="button" onclick="saveAndConnectFirebase()" class="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer">
-                        Lưu & Kết Nối
+                        Kết Nối Database
                     </button>
                 </div>
             </div>
@@ -1002,16 +1019,16 @@
     <script>
         /* =========================================================================
          * PHẦN 1: CẤU HÌNH HỆ THỐNG & BIẾN TOÀN CỤC (SYSTEM CONFIG & GLOBAL STATE)
-         * - Bạn có thể điền trực tiếp link Firebase vào DEFAULT_FIREBASE_URL để các
-         *   máy trong Ban IT mở lên là tự động kết nối không cần nhập tay.
+         * - Bạn có thể điền sẵn DEFAULT_FIREBASE_URL để các máy không cần nhập lại URL.
+         * - Riêng Mã Kênh Bí Mật (Secret Key) KHÔNG tự động điền sẵn mà bắt buộc
+         *   người dùng phải nhập đúng Key mới được kết nối vào Database.
          * ========================================================================= */
-        const DEFAULT_FIREBASE_URL = 'https://pacs-error-list-default-rtdb.asia-southeast1.firebasedatabase.app/';                // Điền link Firebase Realtime Database của bạn vào đây
-        const DEFAULT_FIREBASE_PATH = ''; // Tên nhánh (Secret Channel) lưu dữ liệu trên Firebase
-        const ADMIN_PIN = '140904';                       // Mã PIN Quản trị dùng khi xóa vĩnh viễn / khôi phục gốc
+        const DEFAULT_FIREBASE_URL = 'https://pacs-error-list-default-rtdb.asia-southeast1.firebasedatabase.app/'; // Có thể điền sẵn link Firebase Realtime Database của bạn vào đây
+        const ADMIN_PIN = '402941';        // Mã PIN Quản trị dùng khi xóa vĩnh viễn / khôi phục gốc
 
         // Khóa lưu cấu hình kết nối Firebase trên trình duyệt
         const FB_URL_KEY = 'pacs_fb_database_url';
-        const FB_PATH_KEY = 'pacs_fb_storage_path';
+        const FB_PATH_KEY = ''; // Không dùng key cũ để tránh tự nhận pacs_main_data
 
         // Biến trạng thái dữ liệu ứng dụng (4 nhóm danh mục: Khoa, Phòng, Loại lỗi, Tình trạng)
         let incidents = [];
@@ -1028,27 +1045,32 @@
         // Biến trạng thái cho Tab Thống kê (Tuần / Tháng / Năm / Tất cả)
         let statsGranularity = 'WEEK'; // 'WEEK' | 'MONTH' | 'YEAR' | 'ALL'
         let statsAnchorDate = new Date();
-
-        // Biến bảo vệ chống ghi đè dữ liệu rỗng (Anti-Wipe)
+        // Biến bảo vệ chống ghi đè dữ liệu rỗng (Anti-Wipe) & Xác thực kênh tồn tại
         let hasLoadedFromCloudAtLeastOnce = false;
+        let isChannelVerifiedOnCloud = false; // Chỉ = true khi kênh thực sự tồn tại trên Firebase
         let lastKnownCloudCount = 0;
         let pendingPinCallback = null;
 
-        // Thông tin kết nối Firebase hiện hành
+        // Thông tin kết nối Firebase hiện hành (Bắt buộc cả URL, Secret Key và đã xác thực kênh tồn tại)
         let firebaseDbUrl = '';
         let firebasePath = '';
+
+        // Kiểm tra xem người dùng đã cấu hình đủ cả URL và Secret Key chưa
+        function isFirebaseReady() {
+            return Boolean(firebaseDbUrl && firebaseDbUrl.trim() && firebasePath && firebasePath.trim() && isChannelVerifiedOnCloud);
+        }
 
         // Thông tin tiêu đề hiển thị cho 4 nhóm danh mục ở Tab Config
         const CONFIG_META = {
             departments: {
-                title: '🏥 1. Danh mục Khoa',
+                title: '🏥 1. Danh mục Khoa (Bắt buộc)',
                 subtitle: 'Danh sách các Khoa trong bệnh viện có phát sinh sự cố PACS.',
-                placeholder: 'Nhập tên Khoa mới'
+                placeholder: 'Nhập tên Khoa mới (VD: Khoa Cấp Cứu)...'
             },
             rooms: {
-                title: '🚪 2. Danh mục Phòng thực hiện',
+                title: '🚪 2. Danh mục Phòng thực hiện (Tùy chọn)',
                 subtitle: 'Danh sách các phòng máy chụp X-Quang, CT, MRI, Siêu âm...',
-                placeholder: 'Nhập tên Phòng thực hiện mới'
+                placeholder: 'Nhập tên Phòng thực hiện mới (VD: Phòng CT 128 lát)...'
             },
             categories: {
                 title: '🛠️ 3. Danh mục Phân loại lỗi PACS',
@@ -1077,6 +1099,12 @@
         }
 
         window.addEventListener('click', () => closeToolsDropdown());
+
+        function toggleSecretKeyVisibility() {
+            const input = document.getElementById('fb-path-input');
+            if (!input) return;
+            input.type = (input.type === 'password') ? 'text' : 'password';
+        }
 
         function requireAdminPin(reasonText, onSuccessCallback) {
             pendingPinCallback = onSuccessCallback;
@@ -1114,13 +1142,35 @@
         function getDefaultConfig() {
             return {
                 departments: [
-                    'Khoa Chẩn Đoán Hình Ảnh'
+                    'Khoa Chẩn Đoán Hình Ảnh',
+                    'Khoa Cấp Cứu',
+                    'Khoa Khám Bệnh',
+                    'Khoa Nội Tổng Hợp',
+                    'Khoa Ngoại Tổng Hợp',
+                    'Khoa Hồi Sức Tích Cực (ICU)',
+                    'Khoa Ung Bướu',
+                    'Phòng Công Nghệ Thông Tin (IT)'
                 ],
                 rooms: [
-                    'Phòng X-Quang 1'
+                    'Phòng X-Quang 1',
+                    'Phòng X-Quang 2',
+                    'Phòng CT-Scanner 1',
+                    'Phòng CT-Scanner 2',
+                    'Phòng MRI 1.5T',
+                    'Phòng Siêu Âm 1',
+                    'Phòng Siêu Âm 2',
+                    'Phòng Nội Soi',
+                    'Phòng Server IT'
                 ],
                 categories: [
-                    'Lỗi kết nối DICOM / Network'
+                    'Lỗi kết nối DICOM / Network',
+                    'Lỗi Worklist HIS-PACS',
+                    'Lỗi phần mềm Viewer',
+                    'Lỗi máy trạm / Phần cứng',
+                    'Lỗi lưu trữ Server PACS',
+                    'Lỗi mạng nội bộ (LAN)',
+                    'Sai thông tin hành chính BN',
+                    'Lỗi thao tác người dùng'
                 ],
                 statuses: ['Đang xử lý', 'Đã khắc phục', 'Chờ hãng hỗ trợ']
             };
@@ -1225,6 +1275,7 @@
                 localStorage.removeItem('pacs_desktop_config');
                 localStorage.removeItem('pacs_incidents_v3');
                 localStorage.removeItem('pacs_config_v3');
+                localStorage.removeItem('pacs_fb_storage_path'); // Xóa key cũ từng lưu mặc định pacs_main_data
                 window.name = '';
             } catch (e) {}
         }
@@ -1236,10 +1287,10 @@
 
             try {
                 firebaseDbUrl = localStorage.getItem(FB_URL_KEY) || DEFAULT_FIREBASE_URL || '';
-                firebasePath = localStorage.getItem(FB_PATH_KEY) || DEFAULT_FIREBASE_PATH || '';
+                firebasePath = localStorage.getItem(FB_PATH_KEY) || '';
             } catch (e) {
                 firebaseDbUrl = DEFAULT_FIREBASE_URL || '';
-                firebasePath = DEFAULT_FIREBASE_PATH || '';
+                firebasePath = '';
             }
 
             renderDropdownsInFormAndFilter();
@@ -1247,12 +1298,17 @@
             resetIncidentForm();
             renderAll();
 
-            if (firebaseDbUrl) {
-                updateFirebaseBadge(true);
-                await fetchFromFirebase(false);
+            // Chỉ tự động kết nối khi đã có đầy đủ cả URL và Secret Key do người dùng nhập
+            if (firebaseDbUrl && firebaseDbUrl.trim() && firebasePath && firebasePath.trim()) {
+                const ok = await fetchFromFirebase(false);
+                if (!ok) {
+                    openFirebaseModal();
+                }
             } else {
                 updateFirebaseBadge(false);
-                setCloudStatusIndicator('idle', 'Chưa kết nối DB');
+                setCloudStatusIndicator('idle', 'Chưa nhập Key DB');
+                // Tự động bật bảng yêu cầu người dùng nhập Secret Key ngay khi mở trang
+                openFirebaseModal();
             }
         }
 
@@ -1358,7 +1414,7 @@
         }
 
         async function saveCloudSnapshotIfValid(bundle) {
-            if (!firebaseDbUrl || !bundle || !Array.isArray(bundle.incidents) || bundle.incidents.length === 0) return;
+            if (!isFirebaseReady() || !bundle || !Array.isArray(bundle.incidents) || bundle.incidents.length === 0) return;
             try {
                 const snapEndpoint = getFirebaseEndpoint('_backup_snapshot');
                 await fetch(snapEndpoint, {
@@ -1370,8 +1426,8 @@
         }
 
         async function restoreFromCloudSnapshot() {
-            if (!firebaseDbUrl) {
-                showToast('Vui lòng kết nối Firebase trước!');
+            if (!isFirebaseReady()) {
+                showToast('⚠️ Vui lòng nhập Secret Key và kết nối Database trước!');
                 return;
             }
             requireAdminPin('Nhập Mã PIN Admin để khôi phục từ bản Snapshot trên Cloud:', async () => {
@@ -1384,7 +1440,7 @@
                     }
                     const data = await res.json();
                     if (!data || !Array.isArray(data.incidents) || data.incidents.length === 0) {
-                        showToast('Chưa có bản Snapshot nào trên Cloud!');
+                        showToast('Chưa có bản Snapshot nào trên kênh này!');
                         return;
                     }
                     const { newIncidents, newConfig } = normalizeAndMigrateData(data.incidents, data.configData);
@@ -1406,9 +1462,9 @@
         async function saveAllState(syncToCloud = true, bypassAntiWipe = false) {
             if (!syncToCloud) return;
 
-            if (!firebaseDbUrl) {
-                setCloudStatusIndicator('error', 'Chưa cài Firebase');
-                showToast('⚠️ Bạn chưa cài đặt Firebase DB!');
+            if (!isFirebaseReady()) {
+                setCloudStatusIndicator('error', 'Chưa nhập Key DB');
+                showToast('⚠️ Vui lòng nhập Secret Key để kết nối Database trước!');
                 openFirebaseModal();
                 return;
             }
@@ -1439,7 +1495,7 @@
         }
 
         async function pushToFirebase(bundle) {
-            if (!firebaseDbUrl) return false;
+            if (!isFirebaseReady()) return false;
             try {
                 const endpoint = getFirebaseEndpoint();
                 const res = await fetch(endpoint, {
@@ -1458,74 +1514,176 @@
         }
 
         async function fetchFromFirebase(showToastMsg = true) {
-            if (!firebaseDbUrl) {
-                if (showToastMsg) openFirebaseModal();
-                return;
+            if (!firebaseDbUrl || !firebaseDbUrl.trim() || !firebasePath || !firebasePath.trim()) {
+                if (showToastMsg) {
+                    showToast('⚠️ Vui lòng nhập Secret Key trước khi tải dữ liệu!');
+                    openFirebaseModal();
+                }
+                return false;
             }
             const pullIcon = document.getElementById('cloud-pull-icon');
             if (pullIcon) pullIcon.className = 'fa-solid fa-rotate fa-spin';
-            setCloudStatusIndicator('syncing', 'Đang tải...');
+            setCloudStatusIndicator('syncing', 'Đang xác thực Key...');
+            const initBox = document.getElementById('fb-init-channel-box');
+            if (initBox) initBox.classList.add('hidden');
 
             try {
                 const endpoint = getFirebaseEndpoint();
                 const res = await fetch(endpoint);
                 if (res.ok) {
                     const data = await res.json();
-                    hasLoadedFromCloudAtLeastOnce = true;
-                    if (data && typeof data === 'object') {
-                        const { newIncidents, newConfig, migratedChanged } = normalizeAndMigrateData(data.incidents, data.configData);
-                        incidents = newIncidents;
-                        configData = newConfig;
-                        lastKnownCloudCount = incidents.length;
-
-                        syncMissingValuesIntoConfig();
-                        renderDropdownsInFormAndFilter();
-                        renderConfigTabLists();
-                        renderAll();
-
-                        if (migratedChanged) await saveAllState(true, true);
-                        else setCloudStatusIndicator('ok', `Đã đồng bộ ${getCurrentHMS()}`);
-
-                        const activeCount = incidents.filter(i => !i.deleted).length;
-                        if (showToastMsg) showToast(`✓ Đã tải ${activeCount} sự cố từ Firebase!`);
-                    } else {
+                    // NẾU NHẬP SAI SECRET KEY (NHÁNH KHÔNG TỒN TẠI TRÊN FIREBASE -> TRẢ VỀ NULL)
+                    // CHẶN NGAY LẬP TỨC, KHÔNG TẠO BẢNG MỚI TRÊN FIREBASE!
+                    if (!data || typeof data !== 'object' || (!data.configData && !data.incidents)) {
+                        isChannelVerifiedOnCloud = false;
+                        hasLoadedFromCloudAtLeastOnce = false;
                         incidents = [];
                         lastKnownCloudCount = 0;
-                        configData = getDefaultConfig();
-                        renderDropdownsInFormAndFilter();
-                        renderConfigTabLists();
+                        try { localStorage.removeItem(FB_PATH_KEY); } catch (e) {}
+
+                        updateFirebaseBadge(false);
                         renderAll();
-                        setCloudStatusIndicator('ok', `DB trống (${getCurrentHMS()})`);
+                        setCloudStatusIndicator('error', 'Sai Secret Key!');
+                        const statusEl = document.getElementById('fb-status-badge');
+                        if (statusEl) {
+                            statusEl.className = 'text-red-400 font-bold';
+                            statusEl.textContent = '✕ Sai Secret Key (Không tồn tại)';
+                        }
+                        if (initBox) initBox.classList.remove('hidden');
+                        addFbLog(`✕ TỪ CHỐI KẾT NỐI: Không tìm thấy kênh "${firebasePath}" trên Firebase!`, 'text-red-400 font-bold');
+                        if (showToastMsg) showToast('✕ Sai Secret Key! Không thể kết nối vào Database.');
+                        return false;
                     }
+
+                    // KÊNH HỢP LỆ & CÓ TỒN TẠI TRÊN FIREBASE
+                    isChannelVerifiedOnCloud = true;
+                    hasLoadedFromCloudAtLeastOnce = true;
+                    try {
+                        localStorage.setItem(FB_URL_KEY, firebaseDbUrl);
+                        localStorage.setItem(FB_PATH_KEY, firebasePath);
+                    } catch (e) {}
+                    updateFirebaseBadge(true);
+
+                    const statusEl = document.getElementById('fb-status-badge');
+                    if (statusEl) {
+                        statusEl.className = 'text-emerald-400 font-bold';
+                        statusEl.textContent = '✓ Đã xác thực & Kết nối';
+                    }
+
+                    const { newIncidents, newConfig, migratedChanged } = normalizeAndMigrateData(data.incidents, data.configData);
+                    incidents = newIncidents;
+                    configData = newConfig;
+                    lastKnownCloudCount = incidents.length;
+
+                    syncMissingValuesIntoConfig();
+                    renderDropdownsInFormAndFilter();
+                    renderConfigTabLists();
+                    renderAll();
+
+                    if (migratedChanged) await saveAllState(true, true);
+                    else setCloudStatusIndicator('ok', `Đã đồng bộ ${getCurrentHMS()}`);
+
+                    const activeCount = incidents.filter(i => !i.deleted).length;
+                    addFbLog(`✓ Xác thực Key thành công! Đã tải ${activeCount} sự cố.`, 'text-emerald-400 font-bold');
+                    if (showToastMsg) showToast(`✓ Đã kết nối & tải ${activeCount} sự cố!`);
+                    return true;
                 } else {
-                    setCloudStatusIndicator('error', 'Lỗi đọc DB');
+                    isChannelVerifiedOnCloud = false;
+                    updateFirebaseBadge(false);
+                    setCloudStatusIndicator('error', 'Từ chối truy cập');
+                    addFbLog(`✕ Lỗi HTTP ${res.status}: Sai Secret Key hoặc bị chặn bởi Firebase Rules!`, 'text-red-400 font-bold');
+                    if (showToastMsg) showToast('✕ Không thể kết nối! Kiểm tra lại Secret Key hoặc URL.');
+                    return false;
                 }
             } catch (err) {
+                isChannelVerifiedOnCloud = false;
+                updateFirebaseBadge(false);
                 setCloudStatusIndicator('error', 'Lỗi kết nối DB');
+                addFbLog(`✕ Không thể kết nối tới Firebase URL. Kiểm tra lại đường dẫn URL.`, 'text-red-400 font-bold');
+                if (showToastMsg) showToast('✕ Lỗi đường dẫn Firebase Database URL!');
+                return false;
             } finally {
                 if (pullIcon) pullIcon.className = 'fa-solid fa-rotate';
             }
         }
 
+        // Chỉ Admin có mã PIN mới được phép khởi tạo nhánh Secret Key mới lần đầu tiên trên Firebase
+        function adminInitializeNewChannel() {
+            const url = document.getElementById('fb-url-input').value.trim();
+            const path = document.getElementById('fb-path-input').value.trim();
+            if (!url || !path) {
+                showToast('⚠️ Vui lòng nhập URL và Secret Key muốn khởi tạo!');
+                return;
+            }
+            requireAdminPin(`Nhập PIN Admin để khởi tạo kênh mới "${path}" trên Firebase:`, async () => {
+                firebaseDbUrl = url;
+                firebasePath = path;
+                configData = getDefaultConfig();
+                incidents = [];
+                const savedAt = getCurrentHMS();
+                const bundle = {
+                    incidents: [],
+                    configData,
+                    savedAt,
+                    updatedAt: new Date().toISOString()
+                };
+                try {
+                    const res = await fetch(getFirebaseEndpoint(), {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(bundle)
+                    });
+                    if (res.ok) {
+                        isChannelVerifiedOnCloud = true;
+                        hasLoadedFromCloudAtLeastOnce = true;
+                        try {
+                            localStorage.setItem(FB_URL_KEY, firebaseDbUrl);
+                            localStorage.setItem(FB_PATH_KEY, firebasePath);
+                        } catch (e) {}
+                        document.getElementById('fb-init-channel-box').classList.add('hidden');
+                        updateFirebaseBadge(true);
+                        setCloudStatusIndicator('ok', `Đã tạo kênh (${savedAt})`);
+                        addFbLog(`✓ Admin đã khởi tạo kênh "${firebasePath}" thành công!`, 'text-emerald-400 font-bold');
+                        showToast(`✓ Đã khởi tạo kênh "${firebasePath}" thành công!`);
+                        closeFirebaseModal();
+                    } else {
+                        showToast('✕ Không thể khởi tạo kênh (Bị chặn bởi Firebase Rules)!');
+                    }
+                } catch (e) {
+                    showToast('✕ Lỗi mạng khi khởi tạo kênh!');
+                }
+            });
+        }
+
         function openFirebaseModal() {
-            document.getElementById('fb-url-input').value = firebaseDbUrl;
-            document.getElementById('fb-path-input').value = firebasePath || '';
+            document.getElementById('fb-url-input').value = firebaseDbUrl || DEFAULT_FIREBASE_URL || '';
+            document.getElementById('fb-path-input').value = isChannelVerifiedOnCloud ? (firebasePath || '') : '';
             const disBtn = document.getElementById('btn-fb-disconnect');
             const statusEl = document.getElementById('fb-status-badge');
+            const initBox = document.getElementById('fb-init-channel-box');
+            if (initBox) initBox.classList.add('hidden');
 
-            if (firebaseDbUrl) {
+            if (isFirebaseReady()) {
                 disBtn.classList.remove('hidden');
                 statusEl.className = 'text-emerald-400 font-bold';
-                statusEl.textContent = '✓ Đã kết nối';
+                statusEl.textContent = '✓ Đã xác thực & Kết nối';
             } else {
                 disBtn.classList.add('hidden');
                 statusEl.className = 'text-amber-400 font-bold';
-                statusEl.textContent = 'Chưa kết nối';
+                statusEl.textContent = 'Chưa xác thực Key';
             }
 
             const modal = document.getElementById('firebase-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
+
+            setTimeout(() => {
+                if (!document.getElementById('fb-url-input').value) {
+                    document.getElementById('fb-url-input').focus();
+                } else {
+                    document.getElementById('fb-path-input').focus();
+                }
+            }, 60);
         }
 
         function closeFirebaseModal() {
@@ -1537,17 +1695,18 @@
         function updateFirebaseBadge(isOnline) {
             const label = document.getElementById('cloud-sync-label');
             if (!label) return;
-            if (isOnline && firebaseDbUrl) {
+            if (isOnline && isFirebaseReady()) {
                 label.textContent = 'Đã kết nối';
                 label.className = 'text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold';
             } else {
-                label.textContent = 'Chưa cài';
+                label.textContent = 'Chưa kết nối';
                 label.className = 'text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-bold';
             }
         }
 
         async function manualPushToFirebase() {
-            if (!firebaseDbUrl) {
+            if (!isFirebaseReady()) {
+                showToast('⚠️ Bạn phải nhập Secret Key và kết nối Database trước!');
                 openFirebaseModal();
                 return;
             }
@@ -1589,32 +1748,44 @@
 
         async function saveAndConnectFirebase() {
             const url = document.getElementById('fb-url-input').value.trim();
-            const path = document.getElementById('fb-path-input').value.trim() || '';
+            const path = document.getElementById('fb-path-input').value.trim();
+
             if (!url) {
-                showToast('Vui lòng nhập Database URL!');
+                showToast('⚠️ Vui lòng nhập Firebase Database URL!');
+                document.getElementById('fb-url-input').focus();
                 return;
             }
+            if (!path) {
+                showToast('🔒 Bắt buộc phải nhập Mã Kênh Bí Mật (Secret Key)!');
+                document.getElementById('fb-path-input').focus();
+                return;
+            }
+
             firebaseDbUrl = url;
             firebasePath = path;
-            try {
-                localStorage.setItem(FB_URL_KEY, firebaseDbUrl);
-                localStorage.setItem(FB_PATH_KEY, firebasePath);
-            } catch (e) {}
-            updateFirebaseBadge(true);
-            await fetchFromFirebase(true);
-            closeFirebaseModal();
+            isChannelVerifiedOnCloud = false;
+
+            const connectedOk = await fetchFromFirebase(true);
+            // Chỉ đóng hộp thoại nếu nhập ĐÚNG Secret Key đang tồn tại trên Firebase
+            if (connectedOk) {
+                closeFirebaseModal();
+            }
         }
 
         function disconnectFirebase() {
-            firebaseDbUrl = '';
+            firebasePath = '';
+            isChannelVerifiedOnCloud = false;
+            incidents = [];
+            lastKnownCloudCount = 0;
+            hasLoadedFromCloudAtLeastOnce = false;
             try {
-                localStorage.removeItem(FB_URL_KEY);
                 localStorage.removeItem(FB_PATH_KEY);
             } catch (e) {}
             updateFirebaseBadge(false);
-            setCloudStatusIndicator('idle', 'Đã ngắt DB');
+            setCloudStatusIndicator('idle', 'Đã khóa Key DB');
+            renderAll();
             closeFirebaseModal();
-            showToast('Đã ngắt kết nối Firebase.');
+            showToast('🔒 Đã ngắt kết nối và xóa Secret Key khỏi trình duyệt.');
         }
 
         /* =========================================================================
@@ -1729,7 +1900,7 @@
                 statuses: 'fa-spinner'
             };
             const labels = {
-                departments: '1. Khoa',
+                departments: '1. Khoa (Bắt buộc)',
                 rooms: '2. Phòng thực hiện',
                 categories: '3. Phân loại lỗi PACS',
                 statuses: '4. Tình trạng xử lý'
@@ -2112,7 +2283,12 @@
 
         async function handleFormSubmit(e) {
             e.preventDefault();
-            if (firebaseDbUrl && !hasLoadedFromCloudAtLeastOnce) {
+            if (!isFirebaseReady()) {
+                showToast('🔒 Vui lòng nhập Secret Key và kết nối Database trước khi lưu sự cố!');
+                openFirebaseModal();
+                return;
+            }
+            if (!hasLoadedFromCloudAtLeastOnce) {
                 await fetchFromFirebase(false);
             }
 
@@ -2632,17 +2808,15 @@
         /* =========================================================================
          * PHẦN 11: MODULE THỐNG KÊ SỐ LIỆU THEO TUẦN / THÁNG / NĂM (STATISTICS TAB)
          * ========================================================================= */
-        // Lấy ngày Thứ Hai đầu tuần của một ngày bất kỳ
         function getMondayOfWeek(d) {
             const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-            const day = date.getDay(); // 0 (CN) -> 6 (T7)
+            const day = date.getDay();
             const diff = (day === 0 ? -6 : 1 - day);
             date.setDate(date.getDate() + diff);
             date.setHours(0, 0, 0, 0);
             return date;
         }
 
-        // Chuyển đổi chế độ xem thống kê: WEEK | MONTH | YEAR | ALL
         function setStatsGranularity(mode) {
             statsGranularity = mode;
             const modes = ['WEEK', 'MONTH', 'YEAR', 'ALL'];
@@ -2668,7 +2842,6 @@
             renderStatsTab();
         }
 
-        // Lùi hoặc tiến 1 Tuần / 1 Tháng / 1 Năm
         function stepStatsPeriod(dir) {
             const d = new Date(statsAnchorDate);
             if (statsGranularity === 'WEEK') {
@@ -2687,7 +2860,6 @@
             renderStatsTab();
         }
 
-        // Tính khoảng thời gian bắt đầu & kết thúc và các cột biểu đồ theo kỳ đang chọn
         function getStatsPeriodRangeAndBuckets() {
             const pad = n => String(n).padStart(2, '0');
             const anchor = new Date(statsAnchorDate);
@@ -2767,7 +2939,6 @@
                     });
                 }
             } else {
-                // Chế độ ALL: Gom theo các tháng xuất hiện hoặc 6 tháng gần nhất
                 periodLabel = 'Tất cả thời gian';
                 trendTitle = 'Xu Hướng Sự Cố Theo Tháng (Toàn bộ dữ liệu)';
                 const now = new Date();
@@ -2788,7 +2959,6 @@
             return { startTime, endTime, periodLabel, trendTitle, buckets };
         }
 
-        // Lấy danh sách sự cố thuộc kỳ thống kê đang chọn
         function getFilteredIncidentsForStats() {
             const active = incidents.filter(i => !i.deleted);
             const info = getStatsPeriodRangeAndBuckets();
@@ -2803,7 +2973,6 @@
             return { list, ...info };
         }
 
-        // Vẽ danh sách xếp hạng kèm thanh tỷ lệ %
         function renderBreakdownListHTML(countsMap, totalCount, barColorClass) {
             const entries = Object.entries(countsMap).sort((a, b) => b[1] - a[1]);
             if (!entries.length || totalCount === 0) {
@@ -2825,7 +2994,6 @@
             }).join('');
         }
 
-        // Render toàn bộ giao diện Tab Thống Kê
         function renderStatsTab() {
             const { list, periodLabel, trendTitle, buckets } = getFilteredIncidentsForStats();
 
@@ -2834,7 +3002,6 @@
             const titleEl = document.getElementById('stats-trend-title');
             if (titleEl) titleEl.textContent = trendTitle;
 
-            // 1. Tính 4 KPI của kỳ
             const total = list.length;
             const resolvedList = list.filter(i => i.status === 'Đã khắc phục');
             const pendingCount = total - resolvedList.length;
@@ -2843,7 +3010,6 @@
             const urgentCount = list.filter(i => i.priority === 'Khẩn cấp').length;
             const highCount = list.filter(i => i.priority === 'Cao').length;
 
-            // Thời gian phản hồi trung bình (Reported -> Received)
             let respSum = 0, respValid = 0;
             list.forEach(i => {
                 const m = calcDurationMinutes(i.reportedTime, i.receivedTime || i.reportedTime);
@@ -2851,7 +3017,6 @@
             });
             const avgResp = respValid > 0 ? Math.round(respSum / respValid) : 0;
 
-            // Thời gian khắc phục trung bình (MTTR), Min, Max
             let mttrSum = 0, mttrValid = 0, minMttr = null, maxMttr = null;
             resolvedList.forEach(i => {
                 const m = calcDurationMinutes(i.reportedTime, i.resolvedTime);
@@ -2874,15 +3039,14 @@
                 ? `Nhanh nhất: ${minMttr}p | Lâu nhất: ${maxMttr}p`
                 : 'Chưa có ca hoàn tất trong kỳ';
 
-            // 2. Đổ dữ liệu vào các cột Biểu đồ xu hướng (Trend Chart)
             const bucketMap = {};
             buckets.forEach(b => { bucketMap[b.key] = b; });
 
             list.forEach(item => {
                 const iso = item.reportedTime || '';
                 const key = (statsGranularity === 'WEEK' || statsGranularity === 'MONTH')
-                    ? iso.slice(0, 10)  // YYYY-MM-DD
-                    : iso.slice(0, 7);  // YYYY-MM
+                    ? iso.slice(0, 10)
+                    : iso.slice(0, 7);
                 if (bucketMap[key]) {
                     bucketMap[key].total++;
                     if (item.status === 'Đã khắc phục') bucketMap[key].resolved++;
@@ -2915,7 +3079,6 @@
                 `;
             }
 
-            // 3. Thống kê theo Khoa, Phân loại lỗi, Phòng thực hiện
             const deptMap = {};
             const catMap = {};
             const roomMap = {};
@@ -2951,7 +3114,6 @@
             document.getElementById('stats-by-category').innerHTML = renderBreakdownListHTML(catMap, total, 'bg-purple-600');
             document.getElementById('stats-by-room').innerHTML = renderBreakdownListHTML(roomMap, total, 'bg-amber-500');
 
-            // 4. Bảng chi tiết theo từng Khoa
             const detailBody = document.getElementById('stats-detail-table-body');
             const deptEntries = Object.entries(deptDetailMap).sort((a, b) => b[1].total - a[1].total);
             if (!deptEntries.length) {
@@ -2973,7 +3135,6 @@
             }
         }
 
-        // Xuất bảng báo cáo thống kê của kỳ đang chọn ra file Excel (.csv)
         function exportStatsSummaryCSV() {
             const { list, periodLabel } = getFilteredIncidentsForStats();
             const headers = ['Kỳ thống kê', 'Mã sự cố', 'Ưu tiên', 'Giờ xảy ra', 'Giờ tiếp nhận', 'Khoa', 'Phòng thực hiện', 'Loại lỗi', 'Người báo', 'Mô tả', 'Tình trạng', 'Giờ xong', 'MTTR (phút)'];
@@ -3105,7 +3266,7 @@
             const olderPending = active.filter(i => (i.reportedTime || '').slice(0, 10) !== todayYMD && i.status !== 'Đã khắc phục');
 
             const lines = [
-                `📋 BÁO CÁO SỐ LIỆU VỀ PACS TRONG NGÀY (${todayDisplay})`,
+                `📋 BÁO CÁO GIAO CA PACS TRONG NGÀY (${todayDisplay})`,
                 `📊 Số liệu hôm nay: Tổng ${todayIncidents.length} ca | ✅ Đã xong: ${todayResolved.length} | ⏳ Chưa xong: ${todayPending.length} | ⏱ MTTR: ${todayAvgMttr} phút`,
                 `--------------------------------`
             ];
